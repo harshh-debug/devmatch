@@ -1,0 +1,120 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+enum Availability {
+  ACTIVE
+  OPEN
+  BUSY
+}
+
+enum IntentType {
+  DSA
+  HACKATHON
+  PROJECT
+  OPENSOURCE
+}
+
+enum MatchStatus {
+  PENDING
+  MATCHED
+  REJECTED
+  UNMATCHED
+}
+
+enum MessageType {
+  TEXT
+  CODE_SNIPPET
+  LINK
+}
+
+model User{
+  id           String        @id @default(uuid())
+  email        String        @unique
+  username     String        @unique
+  githubId     String?       @unique
+  displayName  String
+  avatarUrl    String?
+  college      String?
+  bio          String?
+  availability Availability  @default(ACTIVE)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  profile      Profile?
+  intents      MatchIntent[]
+  matchesAsA   Match[]       @relation("MatchUserA")
+  matchesAsB   Match[]       @relation("MatchUserB")
+}
+model Profile {
+  userId             String   @id
+  user               User     @relation(fields: [userId], references: [id])
+  githubUsername     String?
+  leetcodeHandle     String?
+  codeforcesHandle   String?
+  topLanguages       String[]
+  skillTags          String[]
+  githubStars        Int      @default(0)
+  contributionStreak Int      @default(0)
+  lcRating           Int?
+  cfRating           Int?
+  skillVector        Float[]  // stored as FLOAT[], queried in Redis for perf
+  profileScore       Int      @default(0)
+  lastSyncedAt       DateTime?
+}
+ 
+model MatchIntent {
+  id                 String     @id @default(uuid())
+  userId             String
+  user               User       @relation(fields: [userId], references: [id])
+  intentType         IntentType
+  ratingMin          Int?
+  ratingMax          Int?
+  preferredLanguages String[]
+  active             Boolean    @default(true)
+  createdAt          DateTime   @default(now())
+}
+ 
+// ── MATCH SERVICE DOMAIN ─────────────────────────────────────
+model Match {
+  id             String      @id @default(uuid())
+  userAId        String
+  userBId        String
+  userA          User        @relation("MatchUserA", fields: [userAId], references: [id])
+  userB          User        @relation("MatchUserB", fields: [userBId], references: [id])
+  similarityScore Float
+  intentType     IntentType
+  status         MatchStatus @default(PENDING)
+  matchedAt      DateTime?
+  initiatedBy    String
+  createdAt      DateTime    @default(now())
+}
+ 
+// ── CHAT SERVICE DOMAIN ──────────────────────────────────────
+model ChatRoom {
+  id        String    @id @default(uuid())
+  matchId   String    @unique
+  createdAt DateTime  @default(now())
+  messages  Message[]
+}
+ 
+model Message {
+  id         String      @id @default(uuid())
+  chatRoomId String
+  chatRoom   ChatRoom    @relation(fields: [chatRoomId], references: [id])
+  senderId   String
+  content    String
+  type       MessageType @default(TEXT)
+  readAt     DateTime?
+  createdAt  DateTime    @default(now())
+}
