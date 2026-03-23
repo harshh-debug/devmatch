@@ -9,16 +9,13 @@ declare global {
 		interface Request {
 			user?: {
 				id: string;
-				role: string;
+				email: string;
+				username:string
 			};
 		}
 	}
 }
-export const verifyJWT = (
-	req: Request,
-	res: Response,
-	next: NextFunction,
-) => {
+export const verifyJWT = (req: Request, res: Response, next: NextFunction) => {
 	const JWT_SECRET = process.env.JWT_SECRET;
 	if (!JWT_SECRET) {
 		throw new Error("jwt secret not defined");
@@ -29,7 +26,8 @@ export const verifyJWT = (
 		const payload = jwt.verify(token, JWT_SECRET) as MyJwtPayload;
 		req.user = {
 			id: payload.sub,
-			role: payload.role,
+			email: payload.email,
+			username: payload.username,
 		};
 		next();
 	} catch {

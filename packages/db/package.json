@@ -1,6 +1,7 @@
 {
   "name": "db",
   "module": "index.ts",
+  "types": "index.ts",
   "type": "module",
   "devDependencies": {
     "@types/bun": "latest"
@@ -15,7 +16,10 @@
     "pg": "^8.20.0",
     "prisma": "^7.5.0"
   },
-  "exports":{
-    "./client":"./index.ts "
+  "exports": {
+    "./client": {
+      "types": "./index.ts",
+      "default": "./index.ts"
+    }
   }
 }
