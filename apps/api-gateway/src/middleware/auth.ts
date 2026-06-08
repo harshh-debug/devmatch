@@ -25,7 +25,7 @@ export const verifyJWT = (req: Request, res: Response, next: NextFunction) => {
 	try {
 		const payload = jwt.verify(token, JWT_SECRET) as MyJwtPayload;
 		req.user = {
-			id: payload.sub,
+			id: payload.id,
 			email: payload.email,
 			username: payload.username,
 		};

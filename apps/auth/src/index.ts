@@ -11,6 +11,8 @@ if(!PORT){
 }
 
 app.use('/',authRouter);
+app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'auth-service' }))
+
 
 
 app.listen(PORT,()=>{
