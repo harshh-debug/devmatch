@@ -1,9 +1,7 @@
 import express from 'express'
 import authRouter from './routes/authRoutes';
-import prismaClient from 'db/client'
 const app=express()
 app.use(express.json())
-prismaClient
 
 const PORT=process.env.PORT
 if(!PORT){

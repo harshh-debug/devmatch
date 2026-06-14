@@ -11,3 +11,4 @@ const prismaClient = new PrismaClient({ adapter });
 
 export { prismaClient };
 export default prismaClient;
+export * from "./generated/prisma/client";

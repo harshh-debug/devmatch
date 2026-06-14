@@ -58,33 +58,38 @@ model User{
   matchesAsB   Match[]       @relation("MatchUserB")
 }
 model Profile {
-  userId             String   @id
-  user               User     @relation(fields: [userId], references: [id])
-  githubUsername     String?
-  leetcodeHandle     String?
-  codeforcesHandle   String?
-  topLanguages       String[]
-  skillTags          String[]
-  githubStars        Int      @default(0)
-  contributionStreak Int      @default(0)
-  lcRating           Int?
-  cfRating           Int?
-  skillVector        Float[]  // stored as FLOAT[], queried in Redis for perf
-  profileScore       Int      @default(0)
-  lastSyncedAt       DateTime?
-}
+    userId             String    @id
+    user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    githubUsername     String?
+    leetcodeHandle     String?
+    codeforcesHandle   String?
+    codolioHandle      String?
+    topLanguages       String[]
+    skillTags          String[]
+    githubStars        Int       @default(0)
+    contributionStreak Int       @default(0)
+    lcRating           Int?
+    cfRating           Int?
+    skillVector        Float[]
+    profileScore       Int       @default(0)
+    lastSyncedAt       DateTime?
+    createdAt          DateTime  @default(now())
+    updatedAt          DateTime  @updatedAt
+  }
  
 model MatchIntent {
-  id                 String     @id @default(uuid())
-  userId             String
-  user               User       @relation(fields: [userId], references: [id])
-  intentType         IntentType
-  ratingMin          Int?
-  ratingMax          Int?
-  preferredLanguages String[]
-  active             Boolean    @default(true)
-  createdAt          DateTime   @default(now())
-}
+    id                 String     @id @default(uuid())
+    userId             String
+    user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+    intentType         IntentType
+    ratingMin          Int?
+    ratingMax          Int?
+    preferredLanguages String[]
+    preferredDomains   String[]
+    active             Boolean    @default(true)
+    createdAt          DateTime   @default(now())
+    updatedAt          DateTime   @updatedAt
+  }
  
 // ── MATCH SERVICE DOMAIN ─────────────────────────────────────
 model Match {

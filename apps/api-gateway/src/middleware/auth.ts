@@ -1,8 +1,9 @@
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 interface MyJwtPayload extends jwt.JwtPayload {
-	sub: string;
-	role: string;
+	id: string;
+	email: string;
+	username: string;
 }
 declare global {
 	namespace Express {
@@ -10,7 +11,7 @@ declare global {
 			user?: {
 				id: string;
 				email: string;
-				username:string
+				username: string;
 			};
 		}
 	}
@@ -29,6 +30,12 @@ export const verifyJWT = (req: Request, res: Response, next: NextFunction) => {
 			email: payload.email,
 			username: payload.username,
 		};
+
+		// Inject into headers so downstream services can read them
+		req.headers["x-user-id"] = payload.id;
+		req.headers["x-user-email"] = payload.email;
+		req.headers["x-user-username"] = payload.username;
+
 		next();
 	} catch {
 		return res.status(401).json({ error: "Invalid token" });
