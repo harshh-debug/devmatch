@@ -21,3 +21,7 @@ export const setIntentSchema = z.object({
   preferredLanguages: z.array(z.string()).optional(),
   preferredDomains: z.array(z.string()).optional(),
 });
+
+export const connectPlatformSchema = z.object({
+  handle: z.string().trim().min(1, "Handle cannot be empty"),
+});

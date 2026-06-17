@@ -13,9 +13,10 @@
     "@types/express": "^5.0.6",
     "cors": "^2.8.6",
     "db": "*",
+    "@devmatch/bullmq":"*",
     "express": "^5.2.1",
     "helmet": "^8.2.0",
-    "kafka": "*",
+    "@devmatch/kafka": "*",
     "zod": "^4.4.3"
   },
   "scripts": {

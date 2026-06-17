@@ -1,4 +1,4 @@
-import { Kafka, type Producer } from 'kafkajs';
+import { Kafka, Partitioners, type Producer } from '@nemesisas/kafkajs-bun';
 
 // Define your topics here so there are no typos across services
 export const TOPICS = {
@@ -16,7 +16,9 @@ export async function getProducer(): Promise<Producer> {
     brokers: [process.env.KAFKA_BROKERS || 'localhost:9092'] 
   });
 
-  producer = kafka.producer();
+ producer = kafka.producer({
+    createPartitioner: Partitioners.LegacyPartitioner
+  });
   await producer.connect();
   return producer;
 }

@@ -5,7 +5,7 @@ import {
 	updateMeSchema,
 	updateSkillsSchema,
 } from "../validators/user.validators";
-import { publish, TOPICS } from "kafka";
+import { publish, TOPICS } from "@devmatch/kafka";
 
 export const profileHandler = {
 	async getMe(req: Request, res: Response, next: NextFunction) {
