@@ -23,7 +23,7 @@ function proxy(target: string) {
 		},
 	});
 }
-
+proxyRoutes.use("/auth/link", verifyJWT, proxy(AUTH_SERVICE_URL));
 proxyRoutes.use("/auth", proxy(AUTH_SERVICE_URL));
 
 // Public profile pages — anyone can view a developer's public profile.
