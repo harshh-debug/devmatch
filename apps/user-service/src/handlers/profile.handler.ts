@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { profileService } from "../services/profile.service";
-import { vectorService } from "../services/vector.service";
+import { buildSkillVector } from "@devmatch/shared";
 import {
 	updateMeSchema,
 	updateSkillsSchema,
@@ -100,7 +100,7 @@ export const profileHandler = {
 			);
 
 			// 2. Compute the mathematical skill vector
-			const vector = vectorService.buildSkillVector(updatedProfile);
+			const vector = buildSkillVector(updatedProfile);
 
 			// 3. Save the vector to the DB
 			await profileService.updateSkillVector(userId, vector);
@@ -114,6 +114,7 @@ export const profileHandler = {
 				skillVector: vector,
 				skillTags: updatedProfile.skillTags,
 			});
+			updatedProfile.skillVector = vector;
 
 			res.json({
 				success: true,

@@ -1,0 +1,21 @@
+{
+  "name": "profile-parser",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "axios": "^1.18.0",
+    "dotenv": "^17.4.2",
+    "octokit": "^5.0.5",
+    "db": "*",
+    "@devmatch/kafka": "*",
+    "@devmatch/bullmq": "*",
+    "@devmatch/shared": "*"
+  }
+}
