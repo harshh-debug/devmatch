@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "^1.3.14"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -17,5 +17,12 @@
     "@devmatch/kafka": "*",
     "@devmatch/bullmq": "*",
     "@devmatch/shared": "*"
+  },
+  "scripts": {
+    "dev": "bun --hot src/index.ts",
+    "start": "bun src/index.ts",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "bun test"
   }
 }

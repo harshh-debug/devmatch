@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { getProducer } from "@devmatch/kafka"; // <-- Updated import
+import { getProducer } from "@devmatch/kafka"; 
 import { profileSyncWorker } from "./queue/worker";
 
 
@@ -10,7 +10,7 @@ async function bootstrap() {
         // Pre-warm the Kafka connection using your singleton
         await getProducer();
         console.log("✅ Kafka Producer connected");
-
+        profileSyncWorker.run();
         console.log("✅ BullMQ Worker listening on queue: profile-sync-queue");
 
     } catch (error) {

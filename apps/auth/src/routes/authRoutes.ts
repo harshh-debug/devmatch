@@ -10,4 +10,4 @@ authRouter.post('/oauth',oauthUser)
 authRouter.post("/link/github", extractUser, linkGitHub);
 
 
-export default authRouter
+export default authRouter  

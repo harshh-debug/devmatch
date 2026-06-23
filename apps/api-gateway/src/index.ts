@@ -5,7 +5,6 @@ import proxyRoutes from "./routes/proxy";
 
 const app=express()
 app.use(helmet())
-app.use(express.json())
 
 const port=process.env.API_GATEWAY_PORT
 
