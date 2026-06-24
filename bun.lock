@@ -76,7 +76,7 @@
         "@types/node": "^26.0.0",
       },
       "peerDependencies": {
-        "typescript": "^6.0.3",
+        "typescript": "^5",
       },
     },
     "apps/profile-parser": {
