@@ -32,6 +32,10 @@ enum MatchStatus {
   REJECTED
   UNMATCHED
 }
+enum ActionType {
+  ACCEPTED
+  REJECTED
+}
 
 enum MessageType {
   TEXT
@@ -63,7 +67,11 @@ model Profile {
     githubUsername     String?
     leetcodeHandle     String?
     codeforcesHandle   String?
-    codolioHandle      String?
+    lcContestsAttended  Int?
+    lcTotalSolved       Int?
+    lcEasySolved        Int?
+    lcMediumSolved      Int?
+    lcHardSolved        Int?
     topLanguages       String[]
     skillTags          String[]
     githubStars        Int       @default(0)
@@ -71,10 +79,11 @@ model Profile {
     lcRating           Int?
     cfRating           Int?
     skillVector        Float[]
+    availability    Availability  @default(ACTIVE)
     profileScore       Int       @default(0)
     lastSyncedAt       DateTime?
     createdAt          DateTime  @default(now())
-    updatedAt          DateTime  @updatedAt
+    updatedAt          DateTime @default(now()) @updatedAt
   }
  
 model MatchIntent {
@@ -104,6 +113,18 @@ model Match {
   matchedAt      DateTime?
   initiatedBy    String
   createdAt      DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  @@unique([userAId, userBId])
+}
+model MatchAction {
+  id          String       @id @default(uuid())
+  actorId     String
+  targetId    String
+  action      ActionType
+  intentType  IntentType
+  createdAt   DateTime     @default(now())
+
+  @@unique([actorId, targetId, intentType])
 }
  
 // ── CHAT SERVICE DOMAIN ──────────────────────────────────────

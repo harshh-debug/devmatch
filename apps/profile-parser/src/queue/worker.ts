@@ -23,12 +23,12 @@ export const processProfileSync = async (job: { data: SyncJobPayload }) => {
         
         case "leetcode":
             const lcData = await leetcodeProvider.fetchProfileData(handle);
-            updatedProfile = await profileUpdater.updateLeetCodeStats(userId, lcData);
+            updatedProfile = await profileUpdater.updateLeetCodeStats(userId,handle,lcData);
             break;
 
         case "codeforces":
             const cfData = await codeforcesProvider.fetchProfileData(handle);
-            updatedProfile = await profileUpdater.updateCodeforcesStats(userId, cfData);
+            updatedProfile = await profileUpdater.updateCodeforcesStats(userId,handle, cfData);
             break;
         
         default:
@@ -58,3 +58,15 @@ export const profileSyncWorker = new Worker<SyncJobPayload>(
         }
     }
 );
+
+profileSyncWorker.on("completed", (job) => {
+    console.log(`✅ [BullMQ] Job ${job.id} completed successfully for ${job.data.platform} (${job.data.handle}).`);
+});
+
+profileSyncWorker.on("failed", (job, err) => {
+    console.error(`❌ [BullMQ] Job ${job?.id} failed for ${job?.data.platform} (${job?.data.handle}):`, err.message);
+});
+
+profileSyncWorker.on("error", (err) => {
+    console.error(`🚨 [BullMQ] Internal Worker Error:`, err.message);
+});

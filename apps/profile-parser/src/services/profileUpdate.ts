@@ -41,7 +41,7 @@ export const profileUpdater = {
         });
     },
 
-    async updateLeetCodeStats(userId: string, fetchedData: { lcRating: number }) {
+    async updateLeetCodeStats(userId: string,handle: string, fetchedData:any) {
         const existingProfile = await prismaClient.profile.findUnique({
             where: { userId },
             select: { skillTags: true, cfRating: true }
@@ -52,21 +52,27 @@ export const profileUpdater = {
         // Rebuild the Vector with the NEW LC rating, but existing tags and CF rating
         const newVector = buildSkillVector({
             skillTags: existingProfile.skillTags,
-            lcRating: fetchedData.lcRating, // <-- New data
+            lcRating: fetchedData.lcRating,
             cfRating: existingProfile.cfRating
         });
 
         return await prismaClient.profile.update({
             where: { userId },
             data: {
+                leetcodeHandle:handle,
                 lcRating: fetchedData.lcRating,
+                lcContestsAttended: fetchedData.lcContestsAttended,
+                lcTotalSolved: fetchedData.lcTotalSolved,
+                lcEasySolved: fetchedData.lcEasySolved,
+                lcMediumSolved: fetchedData.lcMediumSolved,
+                lcHardSolved: fetchedData.lcHardSolved,
                 skillVector: newVector,
                 lastSyncedAt: new Date(),
             }
         });
     },
 
-    async updateCodeforcesStats(userId: string, fetchedData: { cfRating: number }) {
+    async updateCodeforcesStats(userId: string,handle: string, fetchedData: any) {
         const existingProfile = await prismaClient.profile.findUnique({
             where: { userId },
             select: { skillTags: true, lcRating: true }
@@ -84,6 +90,7 @@ export const profileUpdater = {
         return await prismaClient.profile.update({
             where: { userId },
             data: {
+                codeforcesHandle: handle,
                 cfRating: fetchedData.cfRating,
                 skillVector: newVector,
                 lastSyncedAt: new Date(),

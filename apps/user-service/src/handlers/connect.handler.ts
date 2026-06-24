@@ -2,6 +2,8 @@ import type { Request, Response, NextFunction } from "express";
 import { profileService } from "../services/profile.service";
 import { connectPlatformSchema } from "../validators/user.validators";
 import { profileSyncQueue, type SyncPlatform } from "@devmatch/bullmq";
+import { validateLeetCodeHandle } from "../services/leetcodeValidator";
+import { validateCodeforcesHandle } from "../services/codeforcesValidator";
 
 export const connectHandler = {
   async connectGitHub(req: Request, res: Response, next: NextFunction) {
@@ -53,7 +55,14 @@ export const connectHandler = {
       }
 
       const { handle } = parsed.data;
-
+      const isValid = await validateLeetCodeHandle(handle);
+      if (!isValid) {
+            return res.status(400).json({ 
+                success: false,
+                message: "Invalid LeetCode username. Please check your spelling and try again." 
+            });
+        }
+      
       await profileService.upsertProfile(userId, {
         leetcodeHandle: handle,
       });
@@ -91,6 +100,13 @@ export const connectHandler = {
       }
 
       const { handle } = parsed.data;
+      const isValid = await validateCodeforcesHandle(handle);
+      if (!isValid) {
+            return res.status(400).json({ 
+                success: false,
+                message: "Invalid Codeforces handle. Please check your spelling and try again." 
+            });
+        }
 
       await profileService.upsertProfile(userId, {
         codeforcesHandle: handle,
