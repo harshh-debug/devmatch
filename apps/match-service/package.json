@@ -13,12 +13,12 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@devmatch/bullmq": "*",
+    "@devmatch/kafka": "*",
     "cors": "^2.8.6",
+    "db": "*",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "ioredis": "^5.11.1",
-    "db": "*",
-    "@devmatch/kafka": "*",
-    "@devmatch/bullmq": "*"
+    "ioredis": "^5.11.1"
   }
 }

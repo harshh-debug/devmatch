@@ -17,6 +17,9 @@ declare global {
 	}
 }
 export const verifyJWT = (req: Request, res: Response, next: NextFunction) => {
+	delete req.headers["x-user-id"];
+    delete req.headers["x-user-email"];
+    delete req.headers["x-user-username"];
 	const JWT_SECRET = process.env.JWT_SECRET;
 	if (!JWT_SECRET) {
 		throw new Error("jwt secret not defined");
