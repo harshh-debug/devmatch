@@ -10,20 +10,21 @@ services:
 
       # Kafka listeners
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-
-      # How clients connect from your host machine
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-
-      # Listener configuration
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
 
       # KRaft configuration
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      
+      # Must be a valid 22-char Base64 UUID
+      CLUSTER_ID: "LflMx-7yTVyU_4nQkUcwGQ" 
 
-      # Local development cluster id
-      CLUSTER_ID: "devmatch-local-cluster-1"
+      # Single-Node Overrides (Crucial for local development)
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
 
   redis:
     image: redis:7-alpine
