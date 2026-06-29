@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { matchRoutes } from "./routes/match.routes";
 import { warmVectorCache } from "./services/cache/vectorCache";
 import { startKafkaConsumers } from "./services/kafka/consumer";
+import { createTopicsIfNotExist } from "@devmatch/kafka";
 
 dotenv.config();
 
@@ -30,6 +31,7 @@ async function bootstrap() {
         console.log("🚀 Starting Match Service Boot Sequence...");
         
         await warmVectorCache();
+        await createTopicsIfNotExist();
         await startKafkaConsumers();
 
         app.listen(PORT, () => {

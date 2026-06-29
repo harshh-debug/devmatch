@@ -61,3 +61,35 @@ export async function subscribe(
   console.log(`[Kafka] Subscribed to ${topic} (Group: ${groupId})`);
   return consumer;
 }
+export async function createTopicsIfNotExist(): Promise<void> {
+  const kafka = new Kafka({
+    clientId: 'devmatch-admin',
+    brokers: [process.env.KAFKA_BROKERS || 'localhost:9092'],
+  });
+
+  const admin = kafka.admin();
+  
+  try {
+    await admin.connect();
+    const existingTopics = await admin.listTopics();
+    
+    // Find which topics from our TOPICS registry are missing in Kafka
+    const missingTopics = Object.values(TOPICS)
+      .filter((topic) => !existingTopics.includes(topic))
+      .map((topic) => ({ topic }));
+
+    if (missingTopics.length > 0) {
+      console.log(`[Kafka Admin] Creating missing topics: ${missingTopics.map(t => t.topic).join(', ')}`);
+      await admin.createTopics({
+        topics: missingTopics,
+        waitForLeaders: true,
+      });
+    } else {
+      console.log(`[Kafka Admin] All required topics already exist.`);
+    }
+  } catch (error) {
+    console.error("[Kafka Admin] Failed to verify/create topics:", error);
+  } finally {
+    await admin.disconnect();
+  }
+}
