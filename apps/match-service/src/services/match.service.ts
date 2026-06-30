@@ -120,7 +120,7 @@ async function createMutualMatch(
 		// That is totally fine. It means the match was successfully created 1 millisecond ago.
 		if (error.code === "P2002") {
 			const existingMatch = await prismaClient.match.findUnique({
-				where: { userAId_userBId: { userAId, userBId } },
+				where: { userAId_userBId_intentType: { userAId, userBId,intentType } },
 			});
 			return {
 				action: "ACCEPTED",
