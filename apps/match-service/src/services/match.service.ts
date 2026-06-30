@@ -175,3 +175,58 @@ export async function getMutualMatches(userId: string) {
 		};
 	});
 }
+
+
+
+export async function getPendingRequests(userId: string) {
+    const incomingAccepts = await prismaClient.matchAction.findMany({
+        where: {
+            targetId: userId,
+            action: "ACCEPTED",
+        },
+        orderBy: { createdAt: 'desc' } 
+    });
+
+    if (incomingAccepts.length === 0) return [];
+
+    const requesterIds = incomingAccepts.map(a => a.actorId);
+    const myResponses = await prismaClient.matchAction.findMany({
+        where: {
+            actorId: userId,
+            targetId: { in: requesterIds },
+        },
+    });
+
+    // Example: "user456_HACKATHON"
+    const respondedSet = new Set(
+        myResponses.map(r => `${r.targetId}_${r.intentType}`)
+    );
+
+    const pendingActions = incomingAccepts.filter(
+        a => !respondedSet.has(`${a.actorId}_${a.intentType}`)
+    );
+
+    if (pendingActions.length === 0) return [];
+
+    const uniquePendingIds = [...new Set(pendingActions.map(a => a.actorId))];
+    const profiles = await prismaClient.user.findMany({
+        where: { id: { in: uniquePendingIds } },
+        include: { profile: true },
+    });
+
+    return pendingActions.map(action => {
+        const user = profiles.find(p => p.id === action.actorId)!;
+        return {
+            userId: user.id,
+            username: user.username,
+            displayName: user.displayName,
+            avatarUrl: user.avatarUrl,
+            college: user.college,
+            profileScore: user.profile?.profileScore || 0,
+            cfRating: user.profile?.cfRating || null,
+            skillTags: user.profile?.skillTags || [],
+            requestedIntent: action.intentType, 
+            requestedAt: action.createdAt,
+        };
+    });
+}
