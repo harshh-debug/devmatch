@@ -123,7 +123,6 @@ model MatchAction {
   action      ActionType
   intentType  IntentType
   createdAt   DateTime     @default(now())
-
   @@unique([actorId, targetId, intentType])
 }
  
@@ -133,6 +132,7 @@ model ChatRoom {
   matchId   String    @unique
   createdAt DateTime  @default(now())
   messages  Message[]
+  updatedAt       DateTime    @updatedAt
   match     Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
 }
  
@@ -143,6 +143,10 @@ model Message {
   senderId   String
   content    String
   type       MessageType @default(TEXT)
-  readAt     DateTime?
+  clientMessageId String
+  deliveredAt     DateTime?
+  readAt          DateTime?
   createdAt  DateTime    @default(now())
+  @@unique([chatRoomId, senderId, clientMessageId])
+  @@index([chatRoomId, createdAt(sort: Desc)])
 }

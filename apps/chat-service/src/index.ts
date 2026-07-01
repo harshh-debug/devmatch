@@ -5,10 +5,15 @@ import { createServer } from "http";
 import { env } from "./config/env";
 import { roomRoutes } from "./routes/room.routes";
 import { startRoomConsumers } from "./consumers/matchAccepted.consumer";
+import { Server as SocketIOServer } from "socket.io";
+import { initializeSocketIO } from "./sockets/connection.handler";
 
 const app = express();
 const httpServer = createServer(app);
-
+const io = new SocketIOServer(httpServer, {
+  cors: { origin: "*" } // Restrict this to your frontend URL in production!
+});
+initializeSocketIO(io);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
