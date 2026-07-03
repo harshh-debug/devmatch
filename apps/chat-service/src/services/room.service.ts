@@ -40,15 +40,48 @@ export const RoomService = {
   /**
    * Fetches paginated messages for a validated room.
    */
-  async getRoomMessages(roomId: string, cursor?: string, limit: number = 30) {
-    const messages = await prismaClient.message.findMany({
-      where: { chatRoomId: roomId },
+  async getRoomMessages(
+    roomId: string,
+    cursor?: string,
+    limit: number = 30,
+  ) {
+    let cursorDate: Date | undefined;
+    if (cursor) {
+      const parsed = new Date(cursor);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new Error("Invalid cursor: must be an ISO 8601 timestamp");
+      }
+      cursorDate = parsed;
+    }
+
+    return prismaClient.message.findMany({
+      where: {
+        chatRoomId: roomId,
+        ...(cursorDate ? { createdAt: { lt: cursorDate } } : {}),
+      },
       take: limit,
-      skip: cursor ? 1 : 0, // Skip the cursor itself
-      cursor: cursor ? { id: cursor } : undefined,
       orderBy: { createdAt: "desc" },
     });
+  },
 
-    return messages;
+  /**
+   * Returns the sender of the latest unread message in a room (used to fan out
+   * `chat:read:update` to the correct personal room). Returns null if there are no
+   * unread messages from the other participant.
+   */
+  async getLastUnreadSender(
+    roomId: string,
+    readerId: string,
+  ): Promise<string | null> {
+    const last = await prismaClient.message.findFirst({
+      where: {
+        chatRoomId: roomId,
+        senderId: { not: readerId },
+        readAt: null,
+      },
+      orderBy: { createdAt: "desc" },
+      select: { senderId: true },
+    });
+    return last?.senderId ?? null;
   },
 };

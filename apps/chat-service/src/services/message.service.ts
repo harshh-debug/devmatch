@@ -1,5 +1,6 @@
 // src/services/message.service.ts
 import { prismaClient } from "db/client";
+
 export const MessageService = {
   async saveMessage(data: {
     roomId: string;
@@ -34,7 +35,9 @@ export const MessageService = {
       // 2. Idempotency Guard (P2002: Unique constraint failed)
       // If the client retried and this message already exists, fetch and return the original one.
       if (error.code === "P2002") {
-        console.log(`[Message Service] Idempotent hit for clientMessageId: ${data.clientMessageId}`);
+        console.log(
+          `[Message Service] Idempotent hit for clientMessageId: ${data.clientMessageId}`,
+        );
         const existingMessage = await prismaClient.message.findUnique({
           where: {
             chatRoomId_senderId_clientMessageId: {
@@ -44,14 +47,23 @@ export const MessageService = {
             },
           },
         });
-        
-        if (!existingMessage) throw new Error("Idempotency resolution failed");
+
+        if (!existingMessage) {
+          // The unique constraint fired but we cannot find the row — extremely unlikely
+          // (would require a row to be deleted between the failed INSERT and this read).
+          // Surface a clear, structured error instead of a generic `Error` so the
+          // upstream pipeline can distinguish "idempotency glitch" from a real failure.
+          throw new Error(
+            `Idempotency resolution failed: unique-constraint fired but message for clientMessageId=${data.clientMessageId} not found`,
+          );
+        }
         return existingMessage;
       }
 
       throw error;
     }
   },
+
   async markMessagesAsRead(roomId: string, readerId: string) {
     await prismaClient.message.updateMany({
       where: {
