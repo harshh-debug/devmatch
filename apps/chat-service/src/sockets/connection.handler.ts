@@ -16,6 +16,11 @@ export function initializeSocketIO(io: Server) {
     // 2. Join Personal Room (architecture §3: used for cross-tab sync and system alerts)
     socket.join(userId);
 
+    // Register event listeners SYNCHRONOUSLY before any `await`.
+    registerMessageEvents(io, socket);
+    registerTypingEvents(io, socket);
+    registerReadEvents(io, socket);
+
     // 3. Mark Online in Redis
     await PresenceService.addSocket(userId, socket.id);
 
@@ -49,10 +54,6 @@ export function initializeSocketIO(io: Server) {
         error,
       );
     }
-
-    registerMessageEvents(io, socket);
-    registerTypingEvents(io, socket);
-    registerReadEvents(io, socket);
 
     // 5. Handle Disconnect
     socket.on("disconnect", async (reason) => {

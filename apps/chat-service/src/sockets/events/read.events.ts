@@ -27,14 +27,15 @@ export function registerReadEvents(io: Server, socket: Socket) {
       // timestamp so every recipient agrees on the value.
       const readAt = new Date();
 
-      // 1. Bulk update PostgreSQL
-      await MessageService.markMessagesAsRead(roomId, userId);
-
-      // 2. Find the *other* participant so we can target their personal room.
-      //    architecture §8 requires the read update to be emitted to BOTH the
-      //    sender's and the reader's personal rooms. The reader's is step 3 below;
-      //    the sender's is the one we add here.
+      // 1. Find the *other* participant whose messages are about to be marked read,
+      //    so we can target their personal room. This MUST happen BEFORE the bulk
+      //    update below: `getLastUnreadSender` queries `readAt IS NULL`, so running
+      //    it after `markMessagesAsRead` would always return null and the sender
+      //    would never receive the read receipt (architecture §8 fan-out broken).
       const senderId = await RoomService.getLastUnreadSender(roomId, userId);
+
+      // 2. Bulk update PostgreSQL
+      await MessageService.markMessagesAsRead(roomId, userId);
 
       const readUpdate = {
         roomId,
