@@ -12,6 +12,18 @@
   --color-muted: oklch(0.50 0.005 330);
   --color-border: oklch(0.90 0.003 330);
   --color-ring: oklch(0.58 0.22 342);
+  --color-success: oklch(0.55 0.15 145);
+  --color-success-hover: oklch(0.50 0.16 145);
+  --color-success-bg: oklch(0.95 0.03 145);
+  --color-warning: oklch(0.65 0.15 85);
+  --color-warning-hover: oklch(0.60 0.16 85);
+  --color-warning-bg: oklch(0.95 0.03 85);
+  --color-danger: oklch(0.55 0.18 25);
+  --color-danger-hover: oklch(0.50 0.19 25);
+  --color-danger-bg: oklch(0.95 0.03 25);
+  --color-info: oklch(0.55 0.12 210);
+  --color-info-hover: oklch(0.50 0.13 210);
+  --color-info-bg: oklch(0.95 0.03 210);
 
   --font-display: "Cabinet Grotesk", sans-serif;
   --font-body: "Satoshi", sans-serif;
@@ -69,6 +81,18 @@
     --color-muted: oklch(0.55 0.005 330);
     --color-border: oklch(0.20 0.003 330);
     --color-ring: oklch(0.72 0.17 342);
+    --color-success: oklch(0.65 0.14 145);
+    --color-success-hover: oklch(0.70 0.14 145);
+    --color-success-bg: oklch(0.15 0.03 145);
+    --color-warning: oklch(0.72 0.14 85);
+    --color-warning-hover: oklch(0.77 0.14 85);
+    --color-warning-bg: oklch(0.15 0.03 85);
+    --color-danger: oklch(0.65 0.16 25);
+    --color-danger-hover: oklch(0.70 0.16 25);
+    --color-danger-bg: oklch(0.15 0.03 25);
+    --color-info: oklch(0.65 0.10 210);
+    --color-info-hover: oklch(0.70 0.10 210);
+    --color-info-bg: oklch(0.15 0.03 210);
 
     --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
     --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.4);
@@ -89,6 +113,18 @@
   --color-muted: var(--color-muted);
   --color-border: var(--color-border);
   --color-ring: var(--color-ring);
+  --color-success: var(--color-success);
+  --color-success-hover: var(--color-success-hover);
+  --color-success-bg: var(--color-success-bg);
+  --color-warning: var(--color-warning);
+  --color-warning-hover: var(--color-warning-hover);
+  --color-warning-bg: var(--color-warning-bg);
+  --color-danger: var(--color-danger);
+  --color-danger-hover: var(--color-danger-hover);
+  --color-danger-bg: var(--color-danger-bg);
+  --color-info: var(--color-info);
+  --color-info-hover: var(--color-info-hover);
+  --color-info-bg: var(--color-info-bg);
 
   --font-display: var(--font-display);
   --font-body: var(--font-body);
