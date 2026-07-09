@@ -1,14 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
+import { apiFetch, ApiError } from "@/lib/apiClient";
 
 export default function SignupPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const checkPasswordStrength = (val: string) => {
     let score = 0;
@@ -30,6 +36,50 @@ export default function SignupPage() {
     "var(--color-success)",
   ];
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      await apiFetch("/auth/signup", {
+        method: "POST",
+        body: { email, username, password, displayName },
+      });
+    } catch (err) {
+      setLoading(false);
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Could not create account. Try again.",
+      );
+      return;
+    }
+
+    // Auto-login: re-run the credentials provider against /auth/login.
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+
+    setLoading(false);
+
+    if (!result || result.error) {
+      // Account was created but auto-login failed — send to login.
+      router.push("/login");
+      return;
+    }
+
+    router.push("/discover");
+    router.refresh();
+  }
+
+  function handleGithub() {
+    setError(null);
+    void signIn("github", { redirectTo: "/discover" });
+  }
+
   return (
     <div className="flex-1 flex items-center justify-center px-5 pb-16">
       <div className="w-full max-w-sm">
@@ -46,6 +96,7 @@ export default function SignupPage() {
         {/* GitHub OAuth */}
         <button
           type="button"
+          onClick={handleGithub}
           className="w-full flex items-center justify-center gap-2.5 px-5 py-3 border border-border rounded-xl text-[14px] font-medium text-ink bg-bg hover:bg-surface transition-colors duration-fast"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -64,11 +115,22 @@ export default function SignupPage() {
           </div>
         </div>
 
+        {error && (
+          <div
+            role="alert"
+            className="mb-4 px-3.5 py-2.5 rounded-lg text-[13px] border"
+            style={{
+              borderColor: "var(--color-danger)",
+              color: "var(--color-danger)",
+              backgroundColor: "color-mix(in srgb, var(--color-danger) 8%, transparent)",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
         {/* Form */}
-        <form
-          onSubmit={(e) => e.preventDefault()}
-          className="space-y-4"
-        >
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label
               htmlFor="displayName"
@@ -78,11 +140,13 @@ export default function SignupPage() {
             </label>
             <input
               id="displayName"
+              name="displayName"
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="Sarah Chen"
               required
+              autoComplete="name"
               className="w-full px-3.5 py-2.5 text-[14px] bg-bg border border-border rounded-lg text-ink placeholder:text-muted/60 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring transition-colors duration-fast"
             />
           </div>
@@ -200,9 +264,10 @@ export default function SignupPage() {
 
           <button
             type="submit"
-            className="w-full py-2.5 bg-primary text-bg font-medium text-[14px] rounded-lg hover:bg-primary-hover transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
+            disabled={loading}
+            className="w-full py-2.5 bg-primary text-bg font-medium text-[14px] rounded-lg hover:bg-primary-hover transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Create account
+            {loading ? "Creating account…" : "Create account"}
           </button>
         </form>
 

@@ -13,7 +13,7 @@ export default function CTASection() {
 
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
             <a
-              href="#"
+              href="/signup"
               className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-bg font-medium text-[14px] rounded-full hover:bg-primary-hover transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -22,7 +22,7 @@ export default function CTASection() {
               Sign up with GitHub
             </a>
             <a
-              href="#"
+              href="/signup"
               className="inline-flex items-center justify-center px-6 py-3 border border-border text-ink font-medium text-[14px] rounded-full hover:bg-surface transition-colors duration-fast"
             >
               Sign up with email

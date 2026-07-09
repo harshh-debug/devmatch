@@ -1,6 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiFetch, ApiError } from "@/lib/apiClient";
+import { useToken } from "@/hooks/useToken";
+import type { UserProfile } from "@/lib/types";
 
 const SKILLS_POOL = [
   "TypeScript",
@@ -39,23 +43,38 @@ const ALL_COLLEGES = [
 ];
 
 export default function ProfilePage() {
-  const [displayName, setDisplayName] = useState("Sarah Chen");
-  const [bio, setBio] = useState(
-    "Full-stack engineer passionate about building developer tools. Currently exploring AI-assisted development workflows."
-  );
+  const token = useToken();
+  const queryClient = useQueryClient();
+  const [displayName, setDisplayName] = useState("");
+  const [bio, setBio] = useState("");
   const [college, setCollege] = useState("");
   const [showCollegeDropdown, setShowCollegeDropdown] = useState(false);
-  const [selectedSkills, setSelectedSkills] = useState([
-    "TypeScript",
-    "React",
-    "Node.js",
-    "Postgres",
-  ]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [searchSkill, setSearchSkill] = useState("");
   const [showSkillDropdown, setShowSkillDropdown] = useState(false);
-  const [githubHandle, setGithubHandle] = useState("sarahchen");
-  const [leetcodeHandle, setLeetcodeHandle] = useState("sarahchen_dev");
+  const [githubHandle, setGithubHandle] = useState("");
+  const [leetcodeHandle, setLeetcodeHandle] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: profile } = useQuery({
+    queryKey: ["users", "me"],
+    queryFn: () => apiFetch<UserProfile>("/users/me", { token }),
+    enabled: !!token,
+    retry: 0,
+  });
+
+  // Hydrate local form state once the profile loads.
+  useEffect(() => {
+    if (!profile) return;
+    setDisplayName(profile.displayName ?? "");
+    setBio(profile.bio ?? "");
+    setCollege(profile.college ?? "");
+    setSelectedSkills(profile.skillTags ?? []);
+    setGithubHandle(profile.githubHandle ?? "");
+    setLeetcodeHandle(profile.leetcodeHandle ?? "");
+  }, [profile]);
 
   const addSkill = (skill: string) => {
     if (!selectedSkills.includes(skill)) {
@@ -92,6 +111,76 @@ export default function ProfilePage() {
   };
 
   const completeness = profileCompleteness();
+
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ["users", "me"] });
+  };
+
+  const saveProfile = useMutation({
+    mutationFn: () =>
+      apiFetch("/users/me", {
+        token,
+        method: "PATCH",
+        body: {
+          displayName,
+          bio,
+          college,
+        },
+      }),
+    onError: (err) =>
+      setError(err instanceof ApiError ? err.message : "Could not save profile."),
+  });
+
+  const saveSkills = useMutation({
+    mutationFn: () =>
+      apiFetch("/users/me/skills", {
+        token,
+        method: "PATCH",
+        body: {
+          skillTags: selectedSkills,
+          leetcodeHandle: leetcodeHandle || undefined,
+          githubHandle: githubHandle || undefined,
+        },
+      }),
+    onError: (err) =>
+      setError(err instanceof ApiError ? err.message : "Could not save skills."),
+  });
+
+  function handleSave() {
+    setError(null);
+    setSavedMsg(null);
+    Promise.all([saveProfile.mutateAsync(), saveSkills.mutateAsync()])
+      .then(() => {
+        invalidate();
+        setSavedMsg("Profile saved.");
+      })
+      .catch(() => {
+        /* errors surfaced via mutation onError */
+      });
+  }
+
+  async function handleSyncGithub() {
+    setError(null);
+    setSavedMsg(null);
+    if (!githubHandle) {
+      setError("Enter a GitHub handle first.");
+      return;
+    }
+    setSyncing(true);
+    try {
+      await apiFetch("/users/me/connect/github", {
+        token,
+        method: "POST",
+        body: { handle: githubHandle },
+      });
+      invalidate();
+      setSavedMsg("GitHub sync started — data will refresh shortly.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "GitHub sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   return (
     <div className="max-w-[800px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -305,8 +394,12 @@ export default function ProfilePage() {
               <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-success/10 text-success">
                 Connected
               </span>
-              <button className="text-[11px] text-primary hover:text-primary-hover font-medium transition-colors">
-                Sync
+              <button
+                onClick={handleSyncGithub}
+                disabled={syncing}
+                className="text-[11px] text-primary hover:text-primary-hover font-medium transition-colors disabled:opacity-60"
+              >
+                {syncing ? "Syncing…" : "Sync"}
               </button>
             </div>
 
@@ -348,12 +441,43 @@ export default function ProfilePage() {
         </div>
 
         {/* Save */}
+        {error && (
+          <p role="alert" className="text-[12px]" style={{ color: "var(--color-danger)" }}>
+            {error}
+          </p>
+        )}
+        {savedMsg && (
+          <p className="text-[12px]" style={{ color: "var(--color-success)" }}>
+            {savedMsg}
+          </p>
+        )}
         <div className="flex items-center justify-end gap-3">
-          <button className="px-5 py-2.5 text-[13px] font-medium rounded-lg border border-border text-muted hover:text-ink transition-colors duration-fast">
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setSavedMsg(null);
+              // Re-hydrate from the cached profile.
+              if (profile) {
+                setDisplayName(profile.displayName ?? "");
+                setBio(profile.bio ?? "");
+                setCollege(profile.college ?? "");
+                setSelectedSkills(profile.skillTags ?? []);
+                setGithubHandle(profile.githubHandle ?? "");
+                setLeetcodeHandle(profile.leetcodeHandle ?? "");
+              }
+            }}
+            className="px-5 py-2.5 text-[13px] font-medium rounded-lg border border-border text-muted hover:text-ink transition-colors duration-fast"
+          >
             Cancel
           </button>
-          <button className="px-5 py-2.5 text-[13px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast">
-            Save changes
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saveProfile.isPending || saveSkills.isPending}
+            className="px-5 py-2.5 text-[13px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast disabled:opacity-60"
+          >
+            {saveProfile.isPending || saveSkills.isPending ? "Saving…" : "Save changes"}
           </button>
         </div>
       </div>

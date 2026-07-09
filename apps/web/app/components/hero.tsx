@@ -24,7 +24,7 @@ export default function Hero() {
 
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
             <a
-              href="#cta"
+              href="/signup"
               className="inline-flex items-center justify-center px-6 py-3 bg-primary text-bg font-medium text-[14px] rounded-full hover:bg-primary-hover transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
             >
               Join DevMatch

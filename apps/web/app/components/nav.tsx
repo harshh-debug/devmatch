@@ -25,7 +25,7 @@ export default function Nav() {
     >
       <nav className="mx-auto max-w-[1200px] px-5 sm:px-8 flex items-center justify-between h-16">
         {/* Logo */}
-        <a href="#" className="flex items-center gap-2 font-display font-semibold text-[15px] text-ink tracking-tight">
+        <a href="/" className="flex items-center gap-2 font-display font-semibold text-[15px] text-ink tracking-tight">
           <span
             className="w-5 h-5 rounded-[6px] flex items-center justify-center text-[10px] font-bold"
             style={{ backgroundColor: "var(--color-primary)", color: "var(--color-bg)" }}
@@ -53,13 +53,13 @@ export default function Nav() {
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-2">
           <a
-            href="#cta"
+            href="/login"
             className="text-[13px] text-muted hover:text-ink transition-colors duration-fast px-3 py-2"
           >
             Sign in
           </a>
           <a
-            href="#cta"
+            href="/signup"
             className="text-[13px] font-medium text-bg bg-primary rounded-full px-4 py-2 hover:bg-primary-hover transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
           >
             Get started
@@ -94,7 +94,7 @@ export default function Nav() {
           ))}
           <hr className="border-border my-2" />
           <a
-            href="#cta"
+            href="/signup"
             className="block text-center text-sm font-medium text-bg bg-primary rounded-full px-4 py-2.5 mt-2 hover:bg-primary-hover transition-colors"
             onClick={() => setMobileOpen(false)}
           >

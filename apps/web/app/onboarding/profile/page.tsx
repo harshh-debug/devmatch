@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
+import { apiFetch, ApiError } from "@/lib/apiClient";
+import { useToken } from "@/hooks/useToken";
 
 const COLLEGES = [
   "MIT", "Stanford", "UC Berkeley", "CMU", "Georgia Tech",
@@ -16,17 +20,44 @@ const AVAILABILITY = [
 ];
 
 export default function OnboardingProfilePage() {
+  const router = useRouter();
+  const token = useToken();
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [college, setCollege] = useState("");
   const [showCollegeDropdown, setShowCollegeDropdown] = useState(false);
   const [availability, setAvailability] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const filteredColleges = COLLEGES.filter((c) =>
     c.toLowerCase().includes(college.toLowerCase())
   );
 
   const canProceed = displayName.trim().length > 0;
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      apiFetch("/users/me", {
+        token,
+        method: "PATCH",
+        body: {
+          displayName,
+          bio,
+          college,
+          availability: availability || undefined,
+        },
+      }),
+    onSuccess: () => router.push("/onboarding/skills"),
+    onError: (err) =>
+      setError(err instanceof ApiError ? err.message : "Could not save profile."),
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canProceed) return;
+    setError(null);
+    saveMutation.mutate();
+  }
 
   return (
     <div>
@@ -39,7 +70,7 @@ export default function OnboardingProfilePage() {
         </p>
       </div>
 
-      <form onSubmit={(e) => e.preventDefault()} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {/* Display Name */}
         <div>
           <label htmlFor="displayName" className="block text-[13px] font-medium text-ink mb-1.5">
@@ -136,18 +167,28 @@ export default function OnboardingProfilePage() {
           </div>
         </div>
 
+        {error && (
+          <p
+            role="alert"
+            className="text-[12px]"
+            style={{ color: "var(--color-danger)" }}
+          >
+            {error}
+          </p>
+        )}
+
         {/* Navigation */}
         <div className="flex items-center justify-between pt-2">
           <Link href="/" className="text-[13px] text-muted hover:text-ink transition-colors">Back to home</Link>
-          <Link
-            href={canProceed ? "/onboarding/skills" : "#"}
-            className={`px-6 py-2.5 text-[13px] font-medium rounded-lg transition-colors duration-fast ${
-              canProceed ? "bg-primary text-white hover:bg-primary-hover" : "bg-border text-muted cursor-not-allowed"
-            }`}
-            onClick={(e) => !canProceed && e.preventDefault()}
+          <button
+            type="submit"
+            disabled={!canProceed || saveMutation.isPending}
+            className={`px-6 py-2.5 text-[13px] font-medium rounded-lg transition-colors duration-fast disabled:cursor-not-allowed ${
+              canProceed ? "bg-primary text-white hover:bg-primary-hover" : "bg-border text-muted"
+            } disabled:opacity-60`}
           >
-            Continue
-          </Link>
+            {saveMutation.isPending ? "Saving…" : "Continue"}
+          </button>
         </div>
       </form>
     </div>

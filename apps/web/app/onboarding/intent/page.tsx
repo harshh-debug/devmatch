@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useMutation } from "@tanstack/react-query";
+import { apiFetch, ApiError } from "@/lib/apiClient";
+import { useToken } from "@/hooks/useToken";
+import { completeOnboarding } from "../actions";
 
 const INTENTS = [
   {
@@ -47,11 +51,40 @@ const INTENTS = [
 ];
 
 export default function OnboardingIntentPage() {
+  const token = useToken();
   const [selectedIntent, setSelectedIntent] = useState<string | null>(null);
   const [ratingMin, setRatingMin] = useState(1200);
   const [ratingMax, setRatingMax] = useState(2000);
+  const [error, setError] = useState<string | null>(null);
 
   const isDSA = selectedIntent === "DSA";
+
+  const submitMutation = useMutation({
+    mutationFn: () =>
+      apiFetch("/users/me/intent", {
+        token,
+        method: "POST",
+        body: {
+          intentType: selectedIntent,
+          ...(selectedIntent === "DSA"
+            ? { ratingMin, ratingMax }
+            : {}),
+        },
+      }),
+    onSuccess: () => {
+      // Mark onboarding complete on the session and route into the app.
+      void completeOnboarding();
+    },
+    onError: (err) =>
+      setError(err instanceof ApiError ? err.message : "Could not save intent."),
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedIntent) return;
+    setError(null);
+    submitMutation.mutate();
+  }
 
   return (
     <div>
@@ -64,7 +97,7 @@ export default function OnboardingIntentPage() {
         </p>
       </div>
 
-      <form onSubmit={(e) => e.preventDefault()} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {/* Intent cards */}
         <div className="space-y-2.5">
           {INTENTS.map((intent) => {
@@ -127,21 +160,31 @@ export default function OnboardingIntentPage() {
           </div>
         )}
 
+        {error && (
+          <p
+            role="alert"
+            className="text-[12px]"
+            style={{ color: "var(--color-danger)" }}
+          >
+            {error}
+          </p>
+        )}
+
         {/* Navigation */}
         <div className="flex items-center justify-between pt-2">
           <Link href="/onboarding/skills" className="text-[13px] text-muted hover:text-ink transition-colors">Back</Link>
-          <Link
-            href={selectedIntent ? "/discover" : "#"}
-            className={`px-6 py-2.5 text-[13px] font-medium rounded-lg transition-colors duration-fast inline-flex items-center gap-2 ${
-              selectedIntent ? "bg-primary text-white hover:bg-primary-hover" : "bg-border text-muted cursor-not-allowed"
-            }`}
-            onClick={(e) => !selectedIntent && e.preventDefault()}
+          <button
+            type="submit"
+            disabled={!selectedIntent || submitMutation.isPending}
+            className={`px-6 py-2.5 text-[13px] font-medium rounded-lg transition-colors duration-fast inline-flex items-center gap-2 disabled:cursor-not-allowed ${
+              selectedIntent ? "bg-primary text-white hover:bg-primary-hover" : "bg-border text-muted"
+            } disabled:opacity-60`}
           >
-            Start Matching
+            {submitMutation.isPending ? "Saving…" : "Start Matching"}
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
             </svg>
-          </Link>
+          </button>
         </div>
       </form>
     </div>

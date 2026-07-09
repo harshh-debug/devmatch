@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
+import { apiFetch, ApiError } from "@/lib/apiClient";
+import { useToken } from "@/hooks/useToken";
 
 const SKILLS_POOL = [
   "TypeScript", "JavaScript", "React", "Next.js", "Vue", "Angular",
@@ -13,12 +17,17 @@ const SKILLS_POOL = [
 ];
 
 export default function OnboardingSkillsPage() {
+  const router = useRouter();
+  const token = useToken();
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [searchSkill, setSearchSkill] = useState("");
   const [showSkillDropdown, setShowSkillDropdown] = useState(false);
   const [githubHandle, setGithubHandle] = useState("");
   const [leetcodeHandle, setLeetcodeHandle] = useState("");
   const [codeforcesHandle, setCodeforcesHandle] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   const addSkill = (skill: string) => {
     if (!selectedSkills.includes(skill)) {
@@ -38,6 +47,53 @@ export default function OnboardingSkillsPage() {
 
   const canProceed = selectedSkills.length >= 1;
 
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      apiFetch("/users/me/skills", {
+        token,
+        method: "PATCH",
+        body: {
+          skillTags: selectedSkills,
+          leetcodeHandle: leetcodeHandle || undefined,
+          githubHandle: githubHandle || undefined,
+        },
+      }),
+    onSuccess: () => router.push("/onboarding/intent"),
+    onError: (err) =>
+      setError(err instanceof ApiError ? err.message : "Could not save skills."),
+  });
+
+  async function handleSync() {
+    setError(null);
+    setSyncMsg(null);
+    if (!githubHandle) {
+      setError("Enter a GitHub handle to sync.");
+      return;
+    }
+    setSyncing(true);
+    try {
+      await apiFetch("/users/me/connect/github", {
+        token,
+        method: "POST",
+        body: { handle: githubHandle },
+      });
+      setSyncMsg("Sync started — repositories and languages will refresh shortly.");
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "GitHub sync failed.",
+      );
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canProceed) return;
+    setError(null);
+    saveMutation.mutate();
+  }
+
   return (
     <div>
       <div className="mb-8">
@@ -49,7 +105,7 @@ export default function OnboardingSkillsPage() {
         </p>
       </div>
 
-      <form onSubmit={(e) => e.preventDefault()} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {/* Skills selector */}
         <div>
           <label className="block text-[13px] font-medium text-ink mb-2">
@@ -137,28 +193,47 @@ export default function OnboardingSkillsPage() {
             </div>
           </div>
           {(githubHandle || leetcodeHandle || codeforcesHandle) && (
-            <button type="button"
-              className="mt-4 w-full py-2.5 text-[13px] font-medium rounded-lg border border-border text-ink hover:bg-surface transition-colors duration-fast flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={handleSync}
+              disabled={syncing}
+              className="mt-4 w-full py-2.5 text-[13px] font-medium rounded-lg border border-border text-ink hover:bg-surface transition-colors duration-fast flex items-center justify-center gap-2 disabled:opacity-60"
+            >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
               </svg>
-              Sync Profiles Now
+              {syncing ? "Syncing…" : "Sync Profiles Now"}
             </button>
           )}
+          {syncMsg && (
+            <p className="mt-2 text-[11px]" style={{ color: "var(--color-success)" }}>
+              {syncMsg}
+            </p>
+          )}
         </div>
+
+        {error && (
+          <p
+            role="alert"
+            className="text-[12px]"
+            style={{ color: "var(--color-danger)" }}
+          >
+            {error}
+          </p>
+        )}
 
         {/* Navigation */}
         <div className="flex items-center justify-between pt-2">
           <Link href="/onboarding/profile" className="text-[13px] text-muted hover:text-ink transition-colors">Back</Link>
-          <Link
-            href={canProceed ? "/onboarding/intent" : "#"}
-            className={`px-6 py-2.5 text-[13px] font-medium rounded-lg transition-colors duration-fast ${
-              canProceed ? "bg-primary text-white hover:bg-primary-hover" : "bg-border text-muted cursor-not-allowed"
-            }`}
-            onClick={(e) => !canProceed && e.preventDefault()}
+          <button
+            type="submit"
+            disabled={!canProceed || saveMutation.isPending}
+            className={`px-6 py-2.5 text-[13px] font-medium rounded-lg transition-colors duration-fast disabled:cursor-not-allowed ${
+              canProceed ? "bg-primary text-white hover:bg-primary-hover" : "bg-border text-muted"
+            } disabled:opacity-60`}
           >
-            Continue
-          </Link>
+            {saveMutation.isPending ? "Saving…" : "Continue"}
+          </button>
         </div>
       </form>
     </div>

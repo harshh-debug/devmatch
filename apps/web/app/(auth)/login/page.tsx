@@ -1,11 +1,46 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+
+    setLoading(false);
+
+    if (!result || result.error) {
+      setError("Invalid email or password.");
+      return;
+    }
+
+    // Let middleware route to /discover or /onboarding/profile as appropriate.
+    router.push("/discover");
+    router.refresh();
+  }
+
+  function handleGithub() {
+    setError(null);
+    // Server-side OAuth redirect; callback returns to /discover (middleware
+    // re-routes to onboarding if incomplete).
+    void signIn("github", { redirectTo: "/discover" });
+  }
 
   return (
     <div className="flex-1 flex items-center justify-center px-5 pb-16">
@@ -23,6 +58,7 @@ export default function LoginPage() {
         {/* GitHub OAuth */}
         <button
           type="button"
+          onClick={handleGithub}
           className="w-full flex items-center justify-center gap-2.5 px-5 py-3 border border-border rounded-xl text-[14px] font-medium text-ink bg-bg hover:bg-surface transition-colors duration-fast"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -41,11 +77,22 @@ export default function LoginPage() {
           </div>
         </div>
 
+        {error && (
+          <div
+            role="alert"
+            className="mb-4 px-3.5 py-2.5 rounded-lg text-[13px] border"
+            style={{
+              borderColor: "var(--color-danger)",
+              color: "var(--color-danger)",
+              backgroundColor: "color-mix(in srgb, var(--color-danger) 8%, transparent)",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
         {/* Form */}
-        <form
-          onSubmit={(e) => e.preventDefault()}
-          className="space-y-4"
-        >
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label
               htmlFor="email"
@@ -55,11 +102,13 @@ export default function LoginPage() {
             </label>
             <input
               id="email"
+              name="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
+              autoComplete="email"
               className="w-full px-3.5 py-2.5 text-[14px] bg-bg border border-border rounded-lg text-ink placeholder:text-muted/60 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring transition-colors duration-fast"
             />
           </div>
@@ -74,11 +123,13 @@ export default function LoginPage() {
             <div className="relative">
               <input
                 id="password"
+                name="password"
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
                 required
+                autoComplete="current-password"
                 className="w-full px-3.5 py-2.5 text-[14px] bg-bg border border-border rounded-lg text-ink placeholder:text-muted/60 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring transition-colors duration-fast pr-10"
               />
               <button
@@ -104,9 +155,10 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="w-full py-2.5 bg-primary text-bg font-medium text-[14px] rounded-lg hover:bg-primary-hover transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
+            disabled={loading}
+            className="w-full py-2.5 bg-primary text-bg font-medium text-[14px] rounded-lg hover:bg-primary-hover transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Sign in
+            {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
 

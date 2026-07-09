@@ -3,6 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/apiClient";
 
 const NAV_ITEMS = [
   {
@@ -26,7 +29,7 @@ const NAV_ITEMS = [
         <line x1="23" y1="11" x2="17" y2="11" />
       </svg>
     ),
-    badge: 3,
+    badgeKey: "requests" as const,
   },
   {
     label: "Matches",
@@ -48,7 +51,7 @@ const NAV_ITEMS = [
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
       </svg>
     ),
-    unread: 2,
+    badgeKey: "chat" as const,
   },
   {
     label: "Profile",
@@ -72,6 +75,37 @@ const NAV_ITEMS = [
   },
 ];
 
+/** Live unread counts for sidebar / bottom-nav badges. Gracefully 0 when the
+ *  relevant service is unreachable or returns no data. */
+function useUnreadCounts() {
+  const { data: session } = useSession();
+  const token = session?.accessToken;
+  const enabled = !!token;
+
+  const requests = useQuery({
+    queryKey: ["match", "requests"],
+    queryFn: () => apiFetch<unknown[]>("/match/requests", { token }),
+    enabled,
+    retry: 0,
+    staleTime: 60 * 1000,
+  });
+
+  const rooms = useQuery({
+    queryKey: ["chat", "rooms"],
+    queryFn: () => apiFetch<{ unreadCount?: number }[]>("/chat/rooms", { token }),
+    enabled,
+    retry: 0,
+    staleTime: 60 * 1000,
+  });
+
+  const requestsCount = Array.isArray(requests.data) ? requests.data.length : 0;
+  const chatUnread = Array.isArray(rooms.data)
+    ? rooms.data.reduce((n, r) => n + (r.unreadCount ?? 0), 0)
+    : 0;
+
+  return { requests: requestsCount, chat: chatUnread };
+}
+
 export default function AppShellLayout({
   children,
 }: {
@@ -79,12 +113,19 @@ export default function AppShellLayout({
 }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const counts = useUnreadCounts();
 
   const isActive = (href: string) => {
     if (href === "/chat") {
       return pathname === "/chat" || pathname.startsWith("/chat/");
     }
     return pathname === href;
+  };
+
+  const badgeFor = (key?: "requests" | "chat") => {
+    if (key === "requests") return counts.requests;
+    if (key === "chat") return counts.chat;
+    return 0;
   };
 
   return (
@@ -154,6 +195,7 @@ export default function AppShellLayout({
         <nav className="flex-1 py-3 px-3 space-y-0.5 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
             const active = isActive(item.href);
+            const badge = badgeFor(item.badgeKey);
             return (
               <Link
                 key={item.href}
@@ -167,13 +209,13 @@ export default function AppShellLayout({
               >
                 <span className="shrink-0">{item.icon}</span>
                 <span className="flex-1">{item.label}</span>
-                {(item.badge ?? 0) > 0 && (
+                {item.badgeKey === "requests" && badge > 0 && (
                   <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-primary text-white">
-                    {item.badge}
+                    {badge}
                   </span>
                 )}
-                {(item.unread ?? 0) > 0 && (
-                  <span className="w-2 h-2 rounded-full bg-primary" aria-label={`${item.unread} unread messages`} />
+                {item.badgeKey === "chat" && badge > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-primary" aria-label={`${badge} unread messages`} />
                 )}
               </Link>
             );
@@ -183,6 +225,7 @@ export default function AppShellLayout({
         {/* Sign out */}
         <div className="p-3 border-t border-[#262626]">
           <button
+            onClick={() => signOut({ redirectTo: "/login" })}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-[13px] font-medium text-white/50 hover:text-white hover:bg-white/5 transition-colors duration-fast"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -213,6 +256,7 @@ export default function AppShellLayout({
       <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#0A0A0A] border-t border-[#262626] flex items-center justify-around px-2 z-sticky lg:hidden">
         {NAV_ITEMS.slice(0, 5).map((item) => {
           const active = isActive(item.href);
+          const badge = badgeFor(item.badgeKey);
           return (
             <Link
               key={item.href}
@@ -223,9 +267,9 @@ export default function AppShellLayout({
             >
               <span className="relative">
                 {item.icon}
-                {(item.badge ?? 0) > 0 && (
+                {item.badgeKey === "requests" && badge > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[14px] h-[14px] px-0.5 text-[9px] font-bold rounded-full bg-primary text-white">
-                    {item.badge}
+                    {badge}
                   </span>
                 )}
               </span>
