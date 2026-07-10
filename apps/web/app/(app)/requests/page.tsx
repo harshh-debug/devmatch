@@ -1,56 +1,35 @@
 "use client";
 
-import { useState } from "react";
-
-const PENDING_REQUESTS = [
-  {
-    id: "1",
-    name: "Sarah Chen",
-    role: "Full-Stack Engineer",
-    college: "MIT",
-    skills: ["React", "Node.js", "TypeScript", "Postgres"],
-    leetcode: 1850,
-    intent: "Hackathon",
-    mutualSkills: ["TypeScript", "React"],
-    received: "2h ago",
-    avatar: "SC",
-  },
-  {
-    id: "2",
-    name: "David Park",
-    role: "ML Engineer",
-    college: "Stanford",
-    skills: ["Python", "TensorFlow", "PyTorch", "Rust"],
-    leetcode: 2100,
-    intent: "Open Source",
-    mutualSkills: ["Python"],
-    received: "5h ago",
-    avatar: "DP",
-  },
-  {
-    id: "3",
-    name: "Aisha Patel",
-    role: "Backend Developer",
-    college: "UC Berkeley",
-    skills: ["Go", "Docker", "K8s", "Postgres"],
-    leetcode: 1700,
-    intent: "Project",
-    mutualSkills: ["Postgres"],
-    received: "1d ago",
-    avatar: "AP",
-  },
-];
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/apiClient";
+import { useToken } from "@/hooks/useToken";
 
 export default function RequestsPage() {
-  const [requests, setRequests] = useState(PENDING_REQUESTS);
+  const token = useToken();
+  const queryClient = useQueryClient();
 
-  const handleAction = (id: string, action: "accepted" | "declined") => {
-    setRequests((prev) =>
-      action === "accepted"
-        ? prev.filter((r) => r.id !== id)
-        : prev.filter((r) => r.id !== id)
-    );
+  const { data: requests = [] } = useQuery({
+    queryKey: ["match", "requests"],
+    queryFn: () => apiFetch<any[]>("/match/requests", { token }),
+    enabled: !!token,
+  });
+
+  const actionMutation = useMutation({
+    mutationFn: ({ targetId, action }: { targetId: string; action: "ACCEPTED" | "REJECTED" }) =>
+      apiFetch("/match/action", {
+        token,
+        method: "POST",
+        body: { targetId, action },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["match", "requests"] });
+    },
+  });
+
+  const handleAction = (id: string, action: "ACCEPTED" | "REJECTED") => {
+    actionMutation.mutate({ targetId: id, action });
   };
+
 
   return (
     <div className="max-w-[800px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -149,14 +128,16 @@ export default function RequestsPage() {
               {/* Actions */}
               <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border">
                 <button
-                  onClick={() => handleAction(req.id, "declined")}
-                  className="flex-1 py-2.5 text-[13px] font-medium rounded-lg border border-border text-muted hover:text-danger hover:border-danger/30 transition-colors duration-fast"
+                  onClick={() => handleAction(req.id, "REJECTED")}
+                  disabled={actionMutation.isPending}
+                  className="flex-1 py-2.5 text-[13px] font-medium rounded-lg border border-border text-muted hover:text-danger hover:border-danger/30 transition-colors duration-fast disabled:opacity-50"
                 >
                   Decline
                 </button>
                 <button
-                  onClick={() => handleAction(req.id, "accepted")}
-                  className="flex-1 py-2.5 text-[13px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast"
+                  onClick={() => handleAction(req.id, "ACCEPTED")}
+                  disabled={actionMutation.isPending}
+                  className="flex-1 py-2.5 text-[13px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast disabled:opacity-50"
                 >
                   Accept
                 </button>

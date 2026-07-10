@@ -284,11 +284,11 @@ export default function SignupPage() {
 
         <p className="mt-4 text-center text-[11px] text-muted leading-relaxed">
           By creating an account, you agree to our{" "}
-          <a href="#" className="underline hover:text-ink transition-colors">
-            Terms
+          <a href="/" className="underline hover:text-ink transition-colors">
+            Terms of Service
           </a>{" "}
           and{" "}
-          <a href="#" className="underline hover:text-ink transition-colors">
+          <a href="/" className="underline hover:text-ink transition-colors">
             Privacy Policy
           </a>
           .

@@ -30,4 +30,4 @@ userRouter.post('/users/me/connect/codeforces', extractUser, connectHandler.conn
 // ==========================================
 
 // Fetch public profile (MUST be defined after /users/me so Express doesn't treat "me" as an ID)
-userRouter.get('/users/:id', profileHandler.getUser);
+userRouter.get('/users/public/:id', profileHandler.getUser);

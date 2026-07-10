@@ -19,7 +19,7 @@ app.use(cors());
 app.use(express.json());
 
 // Mount REST Routes
-app.use("/chat/rooms", roomRoutes);
+app.use("/api/v1/chat/rooms", roomRoutes);
 
 // Health Check
 app.get("/health", (req, res) => res.status(200).json({ status: "ok" }));

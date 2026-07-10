@@ -8,7 +8,7 @@ if(!PORT){
     throw new Error("Port of auth service is not defined");
 }
 
-app.use('/',authRouter);
+app.use('/api/v1/auth',authRouter);
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'auth-service' }))
 
 

@@ -18,7 +18,7 @@ app.use(express.json());
 app.get("/health", (req, res) => res.status(200).json({ status: "OK", service: "match-service" }));
 
 // Register Match Routes
-app.use("/match", matchRoutes);
+app.use("/api/v1/match", matchRoutes);
 
 /**
  * Boot Sequence:

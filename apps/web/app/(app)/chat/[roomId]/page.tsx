@@ -3,114 +3,47 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-
-const MESSAGES = [
-  {
-    id: "m1",
-    sender: "them",
-    content: "hey! saw we matched on devmatch — working on anything interesting right now?",
-    time: "10:32",
-    status: "read",
-  },
-  {
-    id: "m2",
-    sender: "me",
-    content: "Hey! Yeah, just started on an auth flow for a new project. Need a backend person to pair with on the API layer.",
-    time: "10:33",
-    status: "read",
-  },
-  {
-    id: "m3",
-    sender: "them",
-    content: "nice, i've been working on a model service for the past few weeks — python, fastapi, postgres. stacks pretty well with your typescript frontend work",
-    time: "10:34",
-    status: "read",
-  },
-  {
-    id: "m4",
-    sender: "me",
-    content: "That sounds perfect. Want to jump on a quick call to scope things out?",
-    time: "10:35",
-    status: "read",
-  },
-  {
-    id: "m5",
-    sender: "them",
-    content: "sure, let me finish up this training run and i'll send you a loom. also — here's the service skeleton i've been working on",
-    time: "10:36",
-    status: "read",
-  },
-  {
-    id: "m6",
-    sender: "me",
-    content: "const predict = async (x) => await model.infer(x)",
-    time: "10:37",
-    type: "code",
-    language: "TypeScript",
-    status: "read",
-  },
-  {
-    id: "m7",
-    sender: "them",
-    content: "exactly! i'll share the full repo later. for now, how does your auth flow look?",
-    time: "10:38",
-    status: "read",
-  },
-  {
-    id: "m8",
-    sender: "me",
-    content: "Got the auth flow scaffolded — using NextAuth with GitHub + credentials provider. JWT strategy with refresh tokens.",
-    time: "10:40",
-    status: "read",
-  },
-  {
-    id: "m9",
-    sender: "them",
-    content: "solid choice. i've been using fastapi's built-in oauth, should integrate cleanly",
-    time: "10:41",
-    status: "read",
-  },
-  {
-    id: "m10",
-    sender: "me",
-    content: "got the auth flow scaffolded — how's the model service?",
-    time: "10:42",
-    type: "code",
-    language: "Python",
-    status: "read",
-  },
-  {
-    id: "m11",
-    sender: "them",
-    content: "def predict(features: list[float]) -> float:\n    # model inference here\n    return model.predict(features)",
-    time: "10:43",
-    type: "code",
-    language: "Python",
-    status: "read",
-  },
-  {
-    id: "m12",
-    sender: "me",
-    content: "Clean. Let's sync up tonight after the training run finishes.",
-    time: "10:44",
-    status: "sent",
-  },
-];
-
-const OTHER_USER = {
-  name: "Marcus Johnson",
-  online: true,
-  avatar: "MJ",
-  username: "marcusj",
-};
+import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/apiClient";
+import { useToken } from "@/hooks/useToken";
 
 export default function ChatRoomPage() {
+  const token = useToken();
   const params = useParams();
   const roomId = params.roomId as string;
   const [input, setInput] = useState("");
   const [isCodeMode, setIsCodeMode] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const { data: rooms = [] } = useQuery({
+    queryKey: ["chat", "rooms"],
+    queryFn: () => apiFetch<any[]>("/chat/rooms", { token }),
+    enabled: !!token,
+  });
+
+  const { data: roomInfo } = useQuery({
+    queryKey: ["chat", "room", roomId],
+    queryFn: () => apiFetch<any>(`/chat/rooms/${roomId}`, { token }),
+    enabled: !!token,
+  });
+
+  const { data: messagesData } = useQuery({
+    queryKey: ["chat", "messages", roomId],
+    queryFn: () => apiFetch<any>(`/chat/rooms/${roomId}/messages?limit=30`, { token }),
+    enabled: !!token,
+  });
+
+  const OTHER_USER = roomInfo?.matchedUser || {
+    id: "",
+    name: "Loading...",
+    online: false,
+    avatar: "-",
+    username: "",
+  };
+
+  const messages = messagesData?.messages || [];
+
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -136,23 +69,23 @@ export default function ChatRoomPage() {
           </h1>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
+          {rooms.map((room) => (
             <Link
-              key={i}
-              href={`/chat/room-${i}`}
+              key={room.id}
+              href={`/chat/${room.id}`}
               className={`flex items-center gap-3 px-4 py-3.5 hover:bg-surface transition-colors duration-fast border-b border-border/50 ${
-                i === 1 ? "bg-surface" : ""
+                room.id === roomId ? "bg-surface" : ""
               }`}
             >
               <div className="w-9 h-9 rounded-full bg-ink/10 flex items-center justify-center text-[10px] font-semibold text-ink shrink-0">
-                {["MJ", "PP", "AK", "EZ", "JW", "SR"][i - 1]}
+                {room.avatar || "U"}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-medium text-ink truncate">
-                  {["Marcus Johnson", "Priya Patel", "Alex Kim", "Emily Zhang", "James Wilson", "Sofia Rodriguez"][i - 1]}
+                  {room.name || "User"}
                 </p>
                 <p className="text-[11px] text-muted truncate">
-                  {i === 1 ? "Got the auth flow..." : "Last message..."}
+                  {room.lastMessage || "..."}
                 </p>
               </div>
             </Link>
@@ -210,8 +143,8 @@ export default function ChatRoomPage() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4 space-y-3">
-          {MESSAGES.map((msg) => {
-            const isMe = msg.sender === "me";
+          {messages.map((msg: any) => {
+            const isMe = msg.senderId && OTHER_USER.id ? msg.senderId !== OTHER_USER.id : msg.sender === "me";
             return (
               <div
                 key={msg.id}

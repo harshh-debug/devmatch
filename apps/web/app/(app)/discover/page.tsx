@@ -1,86 +1,45 @@
 "use client";
 
 import { useState } from "react";
-
-const CANDIDATES = [
-  {
-    id: "1",
-    name: "Marcus Johnson",
-    college: "MIT",
-    role: "ML Engineer",
-    skills: ["TensorFlow", "PyTorch", "K8s", "Python"],
-    leetcode: 2100,
-    codeforces: 1850,
-    similarity: 92,
-    intent: "Hackathon",
-    availability: "This weekend",
-    avatar: "MJ",
-  },
-  {
-    id: "2",
-    name: "Priya Patel",
-    college: "Stanford",
-    role: "Frontend Specialist",
-    skills: ["React", "TypeScript", "Tailwind", "Next.js"],
-    leetcode: 1650,
-    codeforces: 1400,
-    similarity: 88,
-    intent: "Open Source",
-    availability: "Weekends",
-    avatar: "PP",
-  },
-  {
-    id: "3",
-    name: "Alex Kim",
-    college: "UC Berkeley",
-    role: "Backend / Infra",
-    skills: ["Go", "Docker", "gRPC", "AWS"],
-    leetcode: 1750,
-    codeforces: 1600,
-    similarity: 79,
-    intent: "Project",
-    availability: "Evenings",
-    avatar: "AK",
-  },
-  {
-    id: "4",
-    name: "Emily Zhang",
-    college: "CMU",
-    role: "Full-Stack Engineer",
-    skills: ["TypeScript", "React", "Node.js", "Postgres"],
-    leetcode: 1950,
-    codeforces: 1700,
-    similarity: 85,
-    intent: "Hackathon",
-    availability: "Flexible",
-    avatar: "EZ",
-  },
-  {
-    id: "5",
-    name: "James Wilson",
-    college: "Georgia Tech",
-    role: "DSA Specialist",
-    skills: ["C++", "Python", "Algorithms", "Java"],
-    leetcode: 2300,
-    codeforces: 2100,
-    similarity: 74,
-    intent: "DSA Partner",
-    availability: "Daily",
-    avatar: "JW",
-  },
-];
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/apiClient";
+import { useToken } from "@/hooks/useToken";
 
 const INTENTS = ["All", "Hackathon", "DSA Partner", "Project", "Open Source"];
 
 export default function DiscoverPage() {
+  const token = useToken();
+  const queryClient = useQueryClient();
   const [activeIntent, setActiveIntent] = useState("All");
   const [filterOpen, setFilterOpen] = useState(false);
-  const [relaxed, setRelaxed] = useState(false);
 
-  const filtered =
-    activeIntent === "All"
-      ? CANDIDATES
-      : CANDIDATES.filter((c) => c.intent === activeIntent);
+  const { data, isLoading } = useQuery({
+    queryKey: ["match", "candidates", activeIntent],
+    queryFn: () =>
+      apiFetch<{ candidates: any[]; relaxed: boolean; similar?: any[] }>(
+        `/match/candidates?intentType=${
+          activeIntent === "All" ? "DSA" : activeIntent
+        }&limit=20`,
+        { token }
+      ),
+    enabled: !!token,
+  });
+
+  const actionMutation = useMutation({
+    mutationFn: ({ targetId, action }: { targetId: string; action: "ACCEPTED" | "REJECTED" }) =>
+      apiFetch("/match/action", {
+        token,
+        method: "POST",
+        body: { targetId, action, intentType: activeIntent === "All" ? "DSA" : activeIntent },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["match", "candidates"] });
+    },
+  });
+
+  const filtered = data?.candidates || [];
+  const relaxed = data?.relaxed || false;
+
 
   return (
     <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -127,7 +86,6 @@ export default function DiscoverPage() {
             key={intent}
             onClick={() => {
               setActiveIntent(intent);
-              setRelaxed(false);
             }}
             className={`shrink-0 px-3.5 py-1.5 text-[12px] font-medium rounded-full transition-colors duration-fast ${
               activeIntent === intent
@@ -305,10 +263,18 @@ export default function DiscoverPage() {
 
               {/* Actions */}
               <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border">
-                <button className="flex-1 py-2 text-[12px] font-medium rounded-lg border border-border text-muted hover:text-ink hover:bg-surface transition-colors duration-fast">
+                <button
+                  onClick={() => actionMutation.mutate({ targetId: candidate.id, action: "REJECTED" })}
+                  disabled={actionMutation.isPending}
+                  className="flex-1 py-2 text-[12px] font-medium rounded-lg border border-border text-muted hover:text-ink hover:bg-surface transition-colors duration-fast disabled:opacity-50"
+                >
                   Skip
                 </button>
-                <button className="flex-1 py-2 text-[12px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast">
+                <button
+                  onClick={() => actionMutation.mutate({ targetId: candidate.id, action: "ACCEPTED" })}
+                  disabled={actionMutation.isPending}
+                  className="flex-1 py-2 text-[12px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast disabled:opacity-50"
+                >
                   Accept
                 </button>
               </div>
@@ -321,7 +287,7 @@ export default function DiscoverPage() {
               Similar profiles
             </h2>
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
-              {CANDIDATES.slice(0, 4).map((c) => (
+              {(data?.similar || []).slice(0, 4).map((c: any) => (
                 <div
                   key={`similar-${c.id}`}
                   className="shrink-0 w-48 border border-border rounded-xl p-3.5 bg-surface hover:border-ink/20 transition-colors duration-normal"

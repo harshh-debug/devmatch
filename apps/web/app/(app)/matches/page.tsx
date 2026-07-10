@@ -1,89 +1,19 @@
 "use client";
 
 import Link from "next/link";
-
-const MATCHES = [
-  {
-    id: "1",
-    roomId: "room-1",
-    name: "Marcus Johnson",
-    role: "ML Engineer",
-    college: "MIT",
-    skills: ["TensorFlow", "PyTorch", "K8s"],
-    intent: "Hackathon",
-    matched: "2 days ago",
-    lastActive: "Online",
-    online: true,
-    avatar: "MJ",
-  },
-  {
-    id: "2",
-    roomId: "room-2",
-    name: "Priya Patel",
-    role: "Frontend Specialist",
-    college: "Stanford",
-    skills: ["React", "TypeScript", "Tailwind"],
-    intent: "Open Source",
-    matched: "5 days ago",
-    lastActive: "2h ago",
-    online: false,
-    avatar: "PP",
-  },
-  {
-    id: "3",
-    roomId: "room-3",
-    name: "Alex Kim",
-    role: "Backend / Infra",
-    college: "UC Berkeley",
-    skills: ["Go", "Docker", "gRPC"],
-    intent: "Project",
-    matched: "1 week ago",
-    lastActive: "1d ago",
-    online: false,
-    avatar: "AK",
-  },
-  {
-    id: "4",
-    roomId: "room-4",
-    name: "Emily Zhang",
-    role: "Full-Stack Engineer",
-    college: "CMU",
-    skills: ["TypeScript", "React", "Node.js"],
-    intent: "Hackathon",
-    matched: "2 weeks ago",
-    lastActive: "Online",
-    online: true,
-    avatar: "EZ",
-  },
-  {
-    id: "5",
-    roomId: "room-5",
-    name: "James Wilson",
-    role: "DSA Specialist",
-    college: "Georgia Tech",
-    skills: ["C++", "Python", "Algorithms"],
-    intent: "DSA Partner",
-    matched: "3 weeks ago",
-    lastActive: "3d ago",
-    online: false,
-    avatar: "JW",
-  },
-  {
-    id: "6",
-    roomId: "room-6",
-    name: "Sofia Rodriguez",
-    role: "DevOps Engineer",
-    college: "UT Austin",
-    skills: ["AWS", "Terraform", "CI/CD"],
-    intent: "Open Source",
-    matched: "1 month ago",
-    lastActive: "Online",
-    online: true,
-    avatar: "SR",
-  },
-];
+import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/apiClient";
+import { useToken } from "@/hooks/useToken";
 
 export default function MatchesPage() {
+  const token = useToken();
+
+  const { data: matches = [] } = useQuery({
+    queryKey: ["match", "matches"],
+    queryFn: () => apiFetch<any[]>("/match/matches", { token }),
+    enabled: !!token,
+  });
+
   return (
     <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
       {/* Header */}
@@ -98,7 +28,7 @@ export default function MatchesPage() {
 
       {/* Grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {MATCHES.map((match) => (
+        {matches.map((match) => (
           <div
             key={match.id}
             className="bg-bg border border-border rounded-xl p-5 flex flex-col hover:border-ink/20 transition-colors duration-normal"

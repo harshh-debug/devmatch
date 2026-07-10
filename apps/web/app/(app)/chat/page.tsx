@@ -2,68 +2,22 @@
 
 import { useState } from "react";
 import Link from "next/link";
-
-const ROOMS = [
-  {
-    id: "room-1",
-    name: "Marcus Johnson",
-    lastMessage: "Got the auth flow working — how's the API service?",
-    time: "2m ago",
-    unread: 2,
-    online: true,
-    avatar: "MJ",
-  },
-  {
-    id: "room-2",
-    name: "Priya Patel",
-    lastMessage: "I'll share the Figma links in a bit",
-    time: "1h ago",
-    unread: 0,
-    online: false,
-    avatar: "PP",
-  },
-  {
-    id: "room-3",
-    name: "Alex Kim",
-    lastMessage: "Can you review my PR when you get a chance?",
-    time: "3h ago",
-    unread: 0,
-    online: false,
-    avatar: "AK",
-  },
-  {
-    id: "room-4",
-    name: "Emily Zhang",
-    lastMessage: "Great working with you on the hackathon!",
-    time: "1d ago",
-    unread: 0,
-    online: true,
-    avatar: "EZ",
-  },
-  {
-    id: "room-5",
-    name: "James Wilson",
-    lastMessage: "Let's practice DP tomorrow",
-    time: "2d ago",
-    unread: 0,
-    online: false,
-    avatar: "JW",
-  },
-  {
-    id: "room-6",
-    name: "Sofia Rodriguez",
-    lastMessage: "Deployment pipeline is green",
-    time: "3d ago",
-    unread: 0,
-    online: true,
-    avatar: "SR",
-  },
-];
+import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/apiClient";
+import { useToken } from "@/hooks/useToken";
 
 export default function ChatListPage() {
+  const token = useToken();
   const [search, setSearch] = useState("");
 
-  const filtered = ROOMS.filter((r) =>
+  const { data: rooms = [] } = useQuery({
+    queryKey: ["chat", "rooms"],
+    queryFn: () => apiFetch<any[]>("/chat/rooms", { token }),
+    enabled: !!token,
+  });
+
+
+  const filtered = rooms.filter((r) =>
     r.name.toLowerCase().includes(search.toLowerCase())
   );
 

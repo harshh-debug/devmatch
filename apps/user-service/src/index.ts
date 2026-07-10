@@ -11,7 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 // Mount the user routes
-app.use('/', userRouter);
+app.use('/api/v1', userRouter);
 
 // Standard health check for Docker/Railway
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'user-service' }));
