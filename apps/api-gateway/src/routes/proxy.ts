@@ -14,6 +14,7 @@ function proxy(target: string) {
 	return createProxyMiddleware({
 		target,
 		changeOrigin: true,
+		pathRewrite: (path, req) => (req as any).originalUrl,
 		on: {
 			error: (err, req, res: any) => {
 				console.error(`[proxy] upstream error → ${target}`, err.message);

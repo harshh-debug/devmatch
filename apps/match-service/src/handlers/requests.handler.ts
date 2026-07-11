@@ -15,7 +15,7 @@ export const getRequests = async (req: Request, res: Response) => {
 
         return res.status(200).json({ 
             success: true, 
-            data: { requests } 
+            data: requests 
         });
 
     } catch (error) {

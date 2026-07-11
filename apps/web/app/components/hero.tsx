@@ -1,4 +1,5 @@
 import InteractiveCard from "./interactive-card";
+import Link from "next/link";
 
 export default function Hero() {
   return (
@@ -23,12 +24,12 @@ export default function Hero() {
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
-            <a
+            <Link
               href="/signup"
               className="inline-flex items-center justify-center px-6 py-3 bg-primary text-bg font-medium text-[14px] rounded-full hover:bg-primary-hover transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
             >
               Join DevMatch
-            </a>
+            </Link>
             <a
               href="#flow"
               className="inline-flex items-center justify-center px-6 py-3 border border-border text-ink font-medium text-[14px] rounded-full hover:bg-surface transition-colors duration-fast"

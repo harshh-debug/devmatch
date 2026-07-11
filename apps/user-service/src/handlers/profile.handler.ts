@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { profileService } from "../services/profile.service";
+import { intentService } from "../services/intent.service";
 import { buildSkillVector } from "@devmatch/shared";
 import {
 	updateMeSchema,
@@ -15,13 +16,18 @@ export const profileHandler = {
 			}
 
 			const userId = req.user.id;
-			const user = await profileService.getProfileByUserId(userId);
+			const [user, activeIntent] = await Promise.all([
+				profileService.getProfileByUserId(userId),
+				intentService.getActiveIntent(userId),
+			]);
 
 			if (!user) {
 				return res.status(404).json({ message: "User not found" });
 			}
-
-			res.json(user);
+			res.json({
+				...user,
+				intentType: activeIntent?.intentType ?? null,
+			});
 		} catch (error) {
 			next(error);
 		}

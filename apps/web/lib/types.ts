@@ -24,9 +24,13 @@ export interface UserProfile {
   bio?: string;
   college?: string;
   availability?: Availability;
+  /** Set for OAuth users: "github" | "credentials" */
+  provider?: string;
   skillTags: string[];
+  intentType?: IntentType;
   leetcodeHandle?: string;
   githubHandle?: string;
+  codeforcesHandle?: string;
   cfRating?: number;
   profileCompleteness?: number;
   /** Language usage percentages, e.g. { TypeScript: 62, Rust: 24 }. */

@@ -42,6 +42,11 @@ interface BackendAuthResponse {
   user: { id: string; email: string; username: string };
 }
 
+/** Minimal profile shape — only fields needed for onboarding gate. */
+interface MeResponse {
+  intentType?: string;
+}
+
 const PROTECTED_PREFIXES = [
   "/discover",
   "/requests",
@@ -49,7 +54,6 @@ const PROTECTED_PREFIXES = [
   "/chat",
   "/profile",
   "/settings",
-  "/onboarding",
 ];
 
 function isProtected(path: string) {
@@ -76,12 +80,20 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
             method: "POST",
             body: { email, password },
           });
+          // Check if the user has already completed onboarding (has an active intent).
+          let onboardingComplete = false;
+          try {
+            const me = await apiFetch<MeResponse>("/users/me", { token: data.token });
+            onboardingComplete = !!me?.intentType;
+          } catch {
+            // If /users/me fails, conservatively assume onboarding not done.
+          }
           return {
             id: data.user.id,
             email: data.user.email,
             username: data.user.username,
             accessToken: data.token,
-            onboardingComplete: false,
+            onboardingComplete,
           };
         } catch {
           return null;
@@ -105,7 +117,13 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           user.email = data.user.email;
           user.username = data.user.username;
           user.accessToken = data.token;
-          user.onboardingComplete = false;
+          // Check if the user has already completed onboarding.
+          try {
+            const me = await apiFetch<MeResponse>("/users/me", { token: data.token });
+            user.onboardingComplete = !!me?.intentType;
+          } catch {
+            user.onboardingComplete = false;
+          }
         } catch {
           // Backend rejected the OAuth exchange — abort sign-in.
           return false;
@@ -151,17 +169,8 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       }
 
       if (isLoggedIn) {
-        // Authenticated users on login/signup go to the next step.
+        // Authenticated users on login/signup go directly to discover.
         if (isAuthRoute) {
-          const target = onboardingComplete ? "/discover" : "/onboarding/profile";
-          return NextResponse.redirect(new URL(target, request.nextUrl));
-        }
-        // Onboarding incomplete but wandering into the app → send back.
-        if (!onboardingComplete && isProtected(path) && !path.startsWith("/onboarding")) {
-          return NextResponse.redirect(new URL("/onboarding/profile", request.nextUrl));
-        }
-        // Already onboarded and lingering on onboarding → forward to app.
-        if (onboardingComplete && path.startsWith("/onboarding")) {
           return NextResponse.redirect(new URL("/discover", request.nextUrl));
         }
       }

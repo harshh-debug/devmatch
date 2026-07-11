@@ -8,7 +8,6 @@ import { apiFetch, ApiError } from "@/lib/apiClient";
 export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -44,7 +43,7 @@ export default function SignupPage() {
     try {
       await apiFetch("/auth/signup", {
         method: "POST",
-        body: { email, username, password, displayName },
+        body: { email, password, displayName },
       });
     } catch (err) {
       setLoading(false);
@@ -149,34 +148,6 @@ export default function SignupPage() {
               autoComplete="name"
               className="w-full px-3.5 py-2.5 text-[14px] bg-bg border border-border rounded-lg text-ink placeholder:text-muted/60 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring transition-colors duration-fast"
             />
-          </div>
-
-          <div>
-            <label
-              htmlFor="username"
-              className="block text-[13px] font-medium text-ink mb-1.5"
-            >
-              Username
-            </label>
-            <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[14px] text-muted/60">
-                @
-              </span>
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
-                placeholder="sarahchen"
-                required
-                className="w-full pl-8 pr-3.5 py-2.5 text-[14px] bg-bg border border-border rounded-lg text-ink placeholder:text-muted/60 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring transition-colors duration-fast"
-              />
-            </div>
-            {username && (
-              <p className="mt-1 text-[12px] text-info">
-                devmatch.com/u/{username}
-              </p>
-            )}
           </div>
 
           <div>

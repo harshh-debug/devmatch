@@ -2,10 +2,11 @@ import  express, { type Request, type Response }  from "express";
 import helmet from "helmet";
 import { rateLimiter } from "./middleware/rateLimit";
 import proxyRoutes from "./routes/proxy";
+import cors from "cors"
 
 const app=express()
 app.use(helmet())
-
+app.use(cors({origin:"*"}));
 const port=process.env.API_GATEWAY_PORT
 
 app.use(rateLimiter)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 const NAV_ITEMS = [
   { label: "How it works", href: "#flow" },
@@ -52,18 +53,18 @@ export default function Nav() {
 
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-2">
-          <a
+          <Link
             href="/login"
             className="text-[13px] text-muted hover:text-ink transition-colors duration-fast px-3 py-2"
           >
             Sign in
-          </a>
-          <a
+          </Link>
+          <Link
             href="/signup"
             className="text-[13px] font-medium text-bg bg-primary rounded-full px-4 py-2 hover:bg-primary-hover transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
           >
             Get started
-          </a>
+          </Link>
         </div>
 
         {/* Mobile hamburger */}
@@ -93,13 +94,20 @@ export default function Nav() {
             </a>
           ))}
           <hr className="border-border my-2" />
-          <a
+          <Link
+            href="/login"
+            className="block text-center text-sm text-muted hover:text-ink py-2.5 transition-colors"
+            onClick={() => setMobileOpen(false)}
+          >
+            Sign in
+          </Link>
+          <Link
             href="/signup"
             className="block text-center text-sm font-medium text-bg bg-primary rounded-full px-4 py-2.5 mt-2 hover:bg-primary-hover transition-colors"
             onClick={() => setMobileOpen(false)}
           >
             Get started
-          </a>
+          </Link>
         </div>
       )}
     </header>

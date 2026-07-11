@@ -6,6 +6,55 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/apiClient";
 import { useToken } from "@/hooks/useToken";
 
+function ChatRoomListItem({ room }: { room: any }) {
+  const token = useToken();
+  const { data: userResp } = useQuery({
+    queryKey: ["users", "public", room.otherUserId],
+    queryFn: () => apiFetch<any>(`/users/public/${room.otherUserId}`, { token }),
+    enabled: !!token && !!room.otherUserId,
+  });
+
+  const user = userResp || {};
+
+  return (
+    <Link
+      href={`/chat/${room.id}`}
+      className="flex items-center gap-3 px-4 sm:px-5 py-3.5 hover:bg-surface transition-colors duration-fast border-b border-border/50"
+    >
+      <div className="relative shrink-0">
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold"
+          style={{
+            backgroundColor: "color-mix(in oklch, var(--color-ink) 8%, transparent)",
+            color: "var(--color-ink)",
+          }}
+          aria-hidden="true"
+        >
+          {user.avatarUrl ? "IMG" : (user.displayName?.charAt(0) || "U")}
+        </div>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[13px] font-medium text-ink truncate">
+            {user.displayName || "Unknown User"}
+          </p>
+          <span className="text-[10px] text-muted shrink-0">
+            {room.lastMessage ? new Date(room.lastMessage.createdAt).toLocaleDateString() : ""}
+          </span>
+        </div>
+        <p className="text-[12px] text-muted truncate mt-0.5">
+          {room.lastMessage ? room.lastMessage.content : "No messages yet"}
+        </p>
+      </div>
+      {room.unreadCount > 0 && (
+        <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-primary text-white shrink-0">
+          {room.unreadCount}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 export default function ChatListPage() {
   const token = useToken();
   const [search, setSearch] = useState("");
@@ -18,7 +67,7 @@ export default function ChatListPage() {
 
 
   const filtered = rooms.filter((r) =>
-    r.name.toLowerCase().includes(search.toLowerCase())
+    r.name?.toLowerCase()?.includes(search.toLowerCase()) ?? true
   );
 
   return (
@@ -57,45 +106,7 @@ export default function ChatListPage() {
         {/* Room list */}
         <div className="flex-1 overflow-y-auto">
           {filtered.map((room) => (
-            <Link
-              key={room.id}
-              href={`/chat/${room.id}`}
-              className="flex items-center gap-3 px-4 sm:px-5 py-3.5 hover:bg-surface transition-colors duration-fast border-b border-border/50"
-            >
-              <div className="relative shrink-0">
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold"
-                  style={{
-                    backgroundColor: "color-mix(in oklch, var(--color-ink) 8%, transparent)",
-                    color: "var(--color-ink)",
-                  }}
-                  aria-hidden="true"
-                >
-                  {room.avatar}
-                </div>
-                {room.online && (
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-success border-2 border-bg" />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[13px] font-medium text-ink truncate">
-                    {room.name}
-                  </p>
-                  <span className="text-[10px] text-muted shrink-0">
-                    {room.time}
-                  </span>
-                </div>
-                <p className="text-[12px] text-muted truncate mt-0.5">
-                  {room.lastMessage}
-                </p>
-              </div>
-              {room.unread > 0 && (
-                <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-primary text-white shrink-0">
-                  {room.unread}
-                </span>
-              )}
-            </Link>
+            <ChatRoomListItem key={room.id} room={room} />
           ))}
 
           {filtered.length === 0 && (

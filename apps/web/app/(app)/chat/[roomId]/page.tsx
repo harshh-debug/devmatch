@@ -1,40 +1,67 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/apiClient";
 import { useToken } from "@/hooks/useToken";
+import { useChat, type ChatMessage } from "@/hooks/useChat";
+import { useSession } from "next-auth/react";
 
 export default function ChatRoomPage() {
   const token = useToken();
+  const { data: session } = useSession();
+  const myUserId = session?.user?.id;
   const params = useParams();
   const roomId = params.roomId as string;
   const [input, setInput] = useState("");
   const [isCodeMode, setIsCodeMode] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── REST: room list (sidebar) ──────────────────────────────────
   const { data: rooms = [] } = useQuery({
     queryKey: ["chat", "rooms"],
     queryFn: () => apiFetch<any[]>("/chat/rooms", { token }),
     enabled: !!token,
   });
 
+  // ── REST: room metadata ────────────────────────────────────────
   const { data: roomInfo } = useQuery({
     queryKey: ["chat", "room", roomId],
     queryFn: () => apiFetch<any>(`/chat/rooms/${roomId}`, { token }),
-    enabled: !!token,
+    enabled: !!token && !!roomId,
   });
 
+  // ── REST: initial message page (cursor pagination) ─────────────
   const { data: messagesData } = useQuery({
     queryKey: ["chat", "messages", roomId],
-    queryFn: () => apiFetch<any>(`/chat/rooms/${roomId}/messages?limit=30`, { token }),
-    enabled: !!token,
+    queryFn: () =>
+      apiFetch<{ messages: ChatMessage[]; nextCursor: string | null }>(
+        `/chat/rooms/${roomId}/messages?limit=30`,
+        { token }
+      ),
+    enabled: !!token && !!roomId,
   });
 
-  const OTHER_USER = roomInfo?.matchedUser || {
+  // ── Socket.io real-time layer ──────────────────────────────────
+  const {
+    messages,
+    peerTyping,
+    peerOnline,
+    sendMessage,
+    sendTyping,
+    markRead,
+    connected,
+    error: socketError,
+  } = useChat({
+    roomId,
+    token,
+    initialMessages: messagesData?.messages ?? [],
+  });
+
+  const OTHER_USER = roomInfo?.matchedUser ?? {
     id: "",
     name: "Loading...",
     online: false,
@@ -42,22 +69,34 @@ export default function ChatRoomPage() {
     username: "",
   };
 
-  const messages = messagesData?.messages || [];
+  // Mark messages as read when room opens.
+  useEffect(() => {
+    if (connected) markRead();
+  }, [connected, markRead]);
 
-
+  // Auto-scroll to latest message.
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
+  }, [messages]);
 
-  // Simulate typing indicator
-  useEffect(() => {
-    const timer = setTimeout(() => setIsTyping(true), 3000);
-    const stop = setTimeout(() => setIsTyping(false), 6000);
-    return () => {
-      clearTimeout(timer);
-      clearTimeout(stop);
-    };
-  }, []);
+  // ── Send ───────────────────────────────────────────────────────
+  const handleSend = useCallback(() => {
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    sendMessage(trimmed, isCodeMode ? "CODE_SNIPPET" : "TEXT");
+    setInput("");
+    // Stop typing indicator.
+    sendTyping(false);
+    if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+  }, [input, isCodeMode, sendMessage, sendTyping]);
+
+  // ── Typing indicator ───────────────────────────────────────────
+  const handleInputChange = (val: string) => {
+    setInput(val);
+    sendTyping(true);
+    if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+    typingDebounceRef.current = setTimeout(() => sendTyping(false), 3000);
+  };
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] lg:h-screen">
@@ -82,7 +121,7 @@ export default function ChatRoomPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-medium text-ink truncate">
-                  {room.name || "User"}
+                  {room.name || room.matchedUser?.displayName || "User"}
                 </p>
                 <p className="text-[11px] text-muted truncate">
                   {room.lastMessage || "..."}
@@ -117,54 +156,82 @@ export default function ChatRoomPage() {
                 }}
                 aria-hidden="true"
               >
-                {OTHER_USER.avatar}
+                {OTHER_USER.avatar ?? OTHER_USER.displayName?.[0] ?? "U"}
               </div>
-              {OTHER_USER.online && (
+              {(peerOnline || OTHER_USER.online) && (
                 <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-success border-2 border-bg" />
               )}
             </div>
             <div className="min-w-0">
               <p className="text-[14px] font-medium text-ink truncate">
-                {OTHER_USER.name}
+                {OTHER_USER.displayName ?? OTHER_USER.name ?? "User"}
               </p>
               <p className="text-[11px] text-muted flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                online
+                {peerTyping ? (
+                  <>
+                    <span className="inline-flex gap-0.5">
+                      <span className="w-1 h-1 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-1 h-1 rounded-full bg-primary animate-bounce" style={{ animationDelay: "120ms" }} />
+                      <span className="w-1 h-1 rounded-full bg-primary animate-bounce" style={{ animationDelay: "240ms" }} />
+                    </span>
+                    <span className="text-primary">typing…</span>
+                  </>
+                ) : (peerOnline || OTHER_USER.online) ? (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                    online
+                  </>
+                ) : (
+                  "offline"
+                )}
               </p>
             </div>
           </div>
-          <Link
-            href={`/u/${OTHER_USER.username}`}
-            className="text-[11px] text-primary hover:text-primary-hover font-medium transition-colors shrink-0"
-          >
-            View profile
-          </Link>
+          <div className="flex items-center gap-2">
+            {!connected && token && (
+              <span className="text-[10px] text-muted animate-pulse">Connecting…</span>
+            )}
+            {OTHER_USER.username && (
+              <Link
+                href={`/u/${OTHER_USER.username}`}
+                className="text-[11px] text-primary hover:text-primary-hover font-medium transition-colors shrink-0"
+              >
+                View profile
+              </Link>
+            )}
+          </div>
         </div>
+
+        {/* Socket error banner */}
+        {socketError && (
+          <div className="px-4 py-2 bg-danger/10 border-b border-danger/20 text-[12px] text-danger">
+            {socketError}
+          </div>
+        )}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4 space-y-3">
-          {messages.map((msg: any) => {
-            const isMe = msg.senderId && OTHER_USER.id ? msg.senderId !== OTHER_USER.id : msg.sender === "me";
+          {messages.map((msg: ChatMessage) => {
+            const isMe = msg.senderId === myUserId || msg.senderId === "__me__";
             return (
               <div
                 key={msg.id}
                 className={`flex ${isMe ? "justify-end" : "justify-start"}`}
               >
-                <div className={`max-w-[85%] sm:max-w-[70%] ${isMe ? "order-1" : "order-1"}`}>
-                  {msg.type === "code" ? (
+                <div className={`max-w-[85%] sm:max-w-[70%] ${msg.pending ? "opacity-60" : ""}`}>
+                  {msg.type === "CODE_SNIPPET" ? (
                     <div className="bg-ink rounded-2xl rounded-br-md px-4 py-3 font-mono text-[12px] leading-relaxed overflow-x-auto">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-bg/50 text-[9px] tracking-wide">
-                          {msg.language}
-                        </span>
+                        <span className="text-bg/50 text-[9px] tracking-wide">CODE</span>
                         <span className="text-bg/20">·</span>
-                        <button className="text-bg/50 hover:text-bg/80 text-[9px] transition-colors">
+                        <button
+                          onClick={() => navigator.clipboard.writeText(msg.content)}
+                          className="text-bg/50 hover:text-bg/80 text-[9px] transition-colors"
+                        >
                           Copy
                         </button>
                       </div>
-                      <pre className="text-bg/90 whitespace-pre-wrap">
-                        {msg.content}
-                      </pre>
+                      <pre className="text-bg/90 whitespace-pre-wrap">{msg.content}</pre>
                     </div>
                   ) : (
                     <div
@@ -182,7 +249,9 @@ export default function ChatRoomPage() {
                       isMe ? "justify-end mr-1" : "ml-1"
                     }`}
                   >
-                    <span className="text-[9px] text-muted">{msg.time}</span>
+                    <span className="text-[9px] text-muted">
+                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
                     {isMe && (
                       <span
                         className={`text-[9px] ${
@@ -192,7 +261,7 @@ export default function ChatRoomPage() {
                         }`}
                         aria-label={msg.status === "read" ? "Read" : "Sent"}
                       >
-                        {msg.status === "read" ? "✓✓" : "✓"}
+                        {msg.pending ? "○" : msg.status === "read" ? "✓✓" : "✓"}
                       </span>
                     )}
                   </div>
@@ -201,8 +270,8 @@ export default function ChatRoomPage() {
             );
           })}
 
-          {/* Typing indicator */}
-          {isTyping && (
+          {/* Typing indicator (real, from Socket.io) */}
+          {peerTyping && (
             <div className="flex justify-start">
               <div className="bg-surface border border-border rounded-2xl rounded-bl-md px-4 py-3 inline-flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-muted animate-bounce" style={{ animationDelay: "0ms" }} />
@@ -223,18 +292,19 @@ export default function ChatRoomPage() {
                 <div className="absolute -top-6 left-0 right-0 flex items-center gap-1.5">
                   <span className="text-[10px] font-mono text-primary">CODE</span>
                   <span className="text-[10px] text-muted">·</span>
-                  <span className="text-[10px] text-muted">Tab to exit</span>
+                  <span className="text-[10px] text-muted">Shift+Enter for newline</span>
                 </div>
               )}
               <textarea
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => handleInputChange(e.target.value)}
                 placeholder={isCodeMode ? "Paste a code snippet..." : "Type a message..."}
                 rows={isCodeMode ? 4 : 1}
                 className="w-full px-3.5 py-2.5 text-[14px] bg-surface border border-border rounded-xl text-ink placeholder:text-muted/60 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring transition-colors duration-fast resize-none font-mono"
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === "Enter" && !e.shiftKey && !isCodeMode) {
                     e.preventDefault();
+                    handleSend();
                   }
                 }}
               />
@@ -256,8 +326,9 @@ export default function ChatRoomPage() {
                 </svg>
               </button>
               <button
+                onClick={handleSend}
+                disabled={!input.trim() || !connected}
                 className="p-2 rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast disabled:opacity-40 disabled:cursor-not-allowed"
-                disabled={!input.trim()}
                 aria-label="Send message"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/lib/apiClient";
 import { useToken } from "@/hooks/useToken";
 import type { UserProfile } from "@/lib/types";
+import { CompletenessWidget } from "@/app/components/profile/CompletenessWidget";
 
 const SKILLS_POOL = [
   "TypeScript",
@@ -54,7 +55,10 @@ export default function ProfilePage() {
   const [showSkillDropdown, setShowSkillDropdown] = useState(false);
   const [githubHandle, setGithubHandle] = useState("");
   const [leetcodeHandle, setLeetcodeHandle] = useState("");
+  const [codeforcesHandle, setCodeforcesHandle] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const [syncingLeetcode, setSyncingLeetcode] = useState(false);
+  const [syncingCf, setSyncingCf] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,6 +78,7 @@ export default function ProfilePage() {
     setSelectedSkills(profile.skillTags ?? []);
     setGithubHandle(profile.githubHandle ?? "");
     setLeetcodeHandle(profile.leetcodeHandle ?? "");
+    setCodeforcesHandle(profile.codeforcesHandle ?? "");
   }, [profile]);
 
   const addSkill = (skill: string) => {
@@ -111,6 +116,14 @@ export default function ProfilePage() {
   };
 
   const completeness = profileCompleteness();
+  const missingFields = [];
+  if (!displayName) missingFields.push({ label: "Add your name", pts: 20, fieldId: "displayName" });
+  if (!bio) missingFields.push({ label: "Add a bio", pts: 20, fieldId: "bio" });
+  if (!college) missingFields.push({ label: "Add your college", pts: 15, fieldId: "college" });
+  if (selectedSkills.length < 3) missingFields.push({ label: "Add 3+ skills", pts: 20, fieldId: "searchSkill" });
+  if (!githubHandle) missingFields.push({ label: "Connect GitHub", pts: 12.5, fieldId: "githubHandle" });
+  if (!leetcodeHandle) missingFields.push({ label: "Connect LeetCode", pts: 12.5, fieldId: "leetcodeHandle" });
+
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["users", "me"] });
@@ -139,7 +152,7 @@ export default function ProfilePage() {
         body: {
           skillTags: selectedSkills,
           leetcodeHandle: leetcodeHandle || undefined,
-          githubHandle: githubHandle || undefined,
+          githubUsername: githubHandle || undefined,
         },
       }),
     onError: (err) =>
@@ -182,6 +195,52 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleSyncLeetcode() {
+    setError(null);
+    setSavedMsg(null);
+    if (!leetcodeHandle) {
+      setError("Enter a LeetCode handle first.");
+      return;
+    }
+    setSyncingLeetcode(true);
+    try {
+      await apiFetch("/users/me/connect/leetcode", {
+        token,
+        method: "POST",
+        body: { handle: leetcodeHandle },
+      });
+      invalidate();
+      setSavedMsg("LeetCode sync started — rating will refresh shortly.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "LeetCode sync failed.");
+    } finally {
+      setSyncingLeetcode(false);
+    }
+  }
+
+  async function handleConnectCodeforces() {
+    setError(null);
+    setSavedMsg(null);
+    if (!codeforcesHandle) {
+      setError("Enter a Codeforces handle first.");
+      return;
+    }
+    setSyncingCf(true);
+    try {
+      await apiFetch("/users/me/connect/codeforces", {
+        token,
+        method: "POST",
+        body: { handle: codeforcesHandle },
+      });
+      invalidate();
+      setSavedMsg("Codeforces sync started — rating will refresh shortly.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Codeforces sync failed.");
+    } finally {
+      setSyncingCf(false);
+    }
+  }
+
   return (
     <div className="max-w-[800px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
       {/* Header */}
@@ -196,48 +255,7 @@ export default function ProfilePage() {
 
       <div className="space-y-6">
         {/* Profile completeness */}
-        <div className="bg-surface border border-border rounded-xl p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[13px] font-medium text-ink">Profile completeness</p>
-            <span className="font-mono text-[14px] text-ink tabular-nums">
-              {completeness}%
-            </span>
-          </div>
-          <div className="h-1.5 rounded-full bg-border overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${completeness}%`,
-                backgroundColor:
-                  completeness >= 80
-                    ? "var(--color-success)"
-                    : completeness >= 50
-                    ? "var(--color-warning)"
-                    : "var(--color-danger)",
-              }}
-            />
-          </div>
-          <div className="flex flex-wrap gap-3 mt-3 text-[11px] text-muted">
-            <span className={displayName ? "text-success" : ""}>
-              {displayName ? "✓" : "○"} Name
-            </span>
-            <span className={bio ? "text-success" : ""}>
-              {bio ? "✓" : "○"} Bio
-            </span>
-            <span className={college ? "text-success" : ""}>
-              {college ? "✓" : "○"} College
-            </span>
-            <span className={selectedSkills.length >= 3 ? "text-success" : ""}>
-              {selectedSkills.length >= 3 ? "✓" : "○"} Skills
-            </span>
-            <span className={githubHandle ? "text-success" : ""}>
-              {githubHandle ? "✓" : "○"} GitHub
-            </span>
-            <span className={leetcodeHandle ? "text-success" : ""}>
-              {leetcodeHandle ? "✓" : "○"} LeetCode
-            </span>
-          </div>
-        </div>
+        <CompletenessWidget completeness={completeness} missingFields={missingFields} />
 
         {/* Display Name */}
         <div className="bg-bg border border-border rounded-xl p-5">
@@ -349,6 +367,7 @@ export default function ProfilePage() {
           {/* Skill search */}
           <div className="relative">
             <input
+              id="searchSkill"
               type="text"
               value={searchSkill}
               onChange={(e) => {
@@ -383,59 +402,98 @@ export default function ProfilePage() {
 
           <div className="space-y-4">
             {/* GitHub */}
-            <div className="flex items-center gap-3 p-3 rounded-lg border border-border">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-ink shrink-0" aria-hidden="true">
-                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
-              </svg>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium text-ink">GitHub</p>
-                <p className="text-[11px] text-muted truncate">{githubHandle}</p>
+            <div className="space-y-2">
+              <div id="githubHandle" className="flex items-center gap-3 p-3 rounded-lg border border-border">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-ink shrink-0" aria-hidden="true">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-ink">GitHub</p>
+                  <p className="text-[11px] text-muted truncate">{githubHandle || "Not connected"}</p>
+                </div>
+                {githubHandle && (
+                  <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-success/10 text-success">
+                    Connected
+                  </span>
+                )}
+                <button
+                  onClick={handleSyncGithub}
+                  disabled={syncing}
+                  className="text-[11px] text-primary hover:text-primary-hover font-medium transition-colors disabled:opacity-60"
+                >
+                  {syncing ? "Syncing…" : githubHandle ? "Sync" : "Connect"}
+                </button>
               </div>
-              <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-success/10 text-success">
-                Connected
-              </span>
-              <button
-                onClick={handleSyncGithub}
-                disabled={syncing}
-                className="text-[11px] text-primary hover:text-primary-hover font-medium transition-colors disabled:opacity-60"
-              >
-                {syncing ? "Syncing…" : "Sync"}
-              </button>
+              {!githubHandle && (
+                <input
+                  type="text"
+                  value={githubHandle}
+                  onChange={(e) => setGithubHandle(e.target.value)}
+                  placeholder="GitHub username"
+                  className="w-full px-3.5 py-2 text-[13px] bg-bg border border-border rounded-lg text-ink placeholder:text-muted/60 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring transition-colors duration-fast"
+                />
+              )}
             </div>
 
             {/* LeetCode */}
-            <div className="flex items-center gap-3 p-3 rounded-lg border border-border">
+            <div id="leetcodeHandle" className="flex items-center gap-3 p-3 rounded-lg border border-border">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-warning shrink-0" aria-hidden="true">
                 <path d="M16.102 16.977a.891.891 0 0 1-.637-.256l-5.207-5.208a.894.894 0 0 1 0-1.27l5.207-5.207a.891.891 0 0 1 1.27 0l.001.001 1.808 1.808a.891.891 0 0 1 0 1.27l-3.94 3.94 3.94 3.94a.891.891 0 0 1 0 1.27l-1.808 1.808a.891.891 0 0 1-.637.256z" />
                 <path d="M9.255 19.963H4.226a.891.891 0 0 1-.891-.891V4.926a.891.891 0 0 1 .891-.891h5.029" />
               </svg>
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-medium text-ink">LeetCode</p>
-                <p className="text-[11px] text-muted truncate">{leetcodeHandle}</p>
+                <p className="text-[11px] text-muted truncate">{leetcodeHandle || "Not connected"}</p>
               </div>
-              <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-success/10 text-success">
-                Connected
-              </span>
-              <button className="text-[11px] text-primary hover:text-primary-hover font-medium transition-colors">
-                Sync
+              {leetcodeHandle && (
+                <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-success/10 text-success">
+                  Connected
+                </span>
+              )}
+              <button
+                onClick={handleSyncLeetcode}
+                disabled={syncingLeetcode}
+                className="text-[11px] text-primary hover:text-primary-hover font-medium transition-colors disabled:opacity-60"
+              >
+                {syncingLeetcode ? "Syncing…" : leetcodeHandle ? "Sync" : "Connect"}
               </button>
             </div>
 
             {/* Codeforces */}
-            <div className="flex items-center gap-3 p-3 rounded-lg border border-border opacity-60">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-info shrink-0" aria-hidden="true">
-                <rect x="1" y="14" width="4" height="7" rx="1" />
-                <rect x="7" y="10" width="4" height="11" rx="1" />
-                <rect x="13" y="4" width="4" height="17" rx="1" />
-                <rect x="19" y="6" width="4" height="15" rx="1" />
-              </svg>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium text-ink">Codeforces</p>
-                <p className="text-[11px] text-muted">Not connected</p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 p-3 rounded-lg border border-border">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-info shrink-0" aria-hidden="true">
+                  <rect x="1" y="14" width="4" height="7" rx="1" />
+                  <rect x="7" y="10" width="4" height="11" rx="1" />
+                  <rect x="13" y="4" width="4" height="17" rx="1" />
+                  <rect x="19" y="6" width="4" height="15" rx="1" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-ink">Codeforces</p>
+                  <p className="text-[11px] text-muted">{codeforcesHandle || "Not connected"}</p>
+                </div>
+                {codeforcesHandle && (
+                  <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-success/10 text-success">
+                    Connected
+                  </span>
+                )}
+                <button
+                  onClick={handleConnectCodeforces}
+                  disabled={syncingCf}
+                  className="text-[11px] text-primary hover:text-primary-hover font-medium transition-colors disabled:opacity-60"
+                >
+                  {syncingCf ? "Connecting…" : codeforcesHandle ? "Sync" : "Connect"}
+                </button>
               </div>
-              <button className="text-[11px] text-primary hover:text-primary-hover font-medium transition-colors">
-                Connect
-              </button>
+              {!codeforcesHandle && (
+                <input
+                  type="text"
+                  value={codeforcesHandle}
+                  onChange={(e) => setCodeforcesHandle(e.target.value)}
+                  placeholder="Codeforces handle (e.g. tourist)"
+                  className="w-full px-3.5 py-2 text-[13px] bg-bg border border-border rounded-lg text-ink placeholder:text-muted/60 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring transition-colors duration-fast"
+                />
+              )}
             </div>
           </div>
         </div>
@@ -465,6 +523,7 @@ export default function ProfilePage() {
                 setSelectedSkills(profile.skillTags ?? []);
                 setGithubHandle(profile.githubHandle ?? "");
                 setLeetcodeHandle(profile.leetcodeHandle ?? "");
+                setCodeforcesHandle(profile.codeforcesHandle ?? "");
               }
             }}
             className="px-5 py-2.5 text-[13px] font-medium rounded-lg border border-border text-muted hover:text-ink transition-colors duration-fast"
