@@ -59,7 +59,7 @@ export async function apiFetch<T = unknown>(
 ): Promise<T> {
   const { token, body, query, headers, ...rest } = opts;
 
-  const finalHeaders: Record<string, string> = {
+  const finalHeaders: any = {
     Accept: "application/json",
     ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
     ...headers,

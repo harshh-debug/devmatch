@@ -149,15 +149,17 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      session.accessToken = token.accessToken ?? "";
-      if (session.user) {
-        session.user.id = token.sub ?? "";
-        session.user.username = token.username ?? "";
-        session.user.onboardingComplete = token.onboardingComplete ?? false;
+      const s = session as any;
+      s.accessToken = token.accessToken ?? "";
+      if (s.user) {
+        s.user.id = token.sub ?? "";
+        s.user.username = token.username ?? "";
+        s.user.onboardingComplete = token.onboardingComplete ?? false;
       }
-      return session;
+      return s;
     },
-    authorized({ request, auth: session }) {
+    authorized({ request, auth }) {
+      const session = auth as any;
       const path = request.nextUrl.pathname;
       const isLoggedIn = !!session?.user;
       const onboardingComplete = session?.user?.onboardingComplete ?? false;

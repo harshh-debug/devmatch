@@ -3,7 +3,7 @@ import type { MatchProfile, IntentType } from "../engine/types";
 import prismaClient from "db/client";
 
 const PROFILES_HASH = "match_profiles";
-const SEEN_KEY = (userId: string, intent: IntentType) =>
+const SEEN_KEY = (userId: string, intent: string) =>
 	`seen:${userId}:${intent}`;
 /**
  * Warms the Redis cache on service startup.
@@ -133,8 +133,11 @@ export async function markAsSeen(
 	intent: IntentType,
 ): Promise<void> {
 	const key = SEEN_KEY(actorId, intent);
+	const allKey = SEEN_KEY(actorId, "ALL");
 	await redisClient.sadd(key, targetId);
+	await redisClient.sadd(allKey, targetId);
 	await redisClient.expire(key, 7 * 24 * 60 * 60); // 7 Days
+	await redisClient.expire(allKey, 7 * 24 * 60 * 60);
 }
 
 /**
@@ -142,7 +145,7 @@ export async function markAsSeen(
  */
 export async function getSeenIds(
 	userId: string,
-	intent: IntentType,
+	intent: string,
 ): Promise<Set<string>> {
 	try {
 		const seenArray = await redisClient.smembers(SEEN_KEY(userId, intent));

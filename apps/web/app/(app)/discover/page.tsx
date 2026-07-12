@@ -153,17 +153,87 @@ function CandidateCard({ candidate, profile, index, actionMutation }: { candidat
 }
 
 export default function DiscoverPage() {
-                  <CandidateCard
-                    candidate={candidate}
-                    profile={profile}
-                    index={index}
-                    actionMutation={actionMutation}
-                  />
-                </React.Fragment>
-              );
-            })}
+  const token = useToken();
+  const [activeIntent, setActiveIntent] = useState("All");
 
+  const { data: userResp } = useQuery({
+    queryKey: ["users", "me"],
+    queryFn: () => apiFetch<any>("/users/me", { token }),
+    enabled: !!token,
+  });
+  const profile = userResp || null;
+
+  // Fetch candidates
+  const { data: candidatesResp } = useQuery({
+    queryKey: ["candidates", activeIntent],
+    queryFn: () => {
+      const qs = activeIntent === "All" ? "?limit=20" : `?intentType=${activeIntent}&limit=20`;
+      return apiFetch<any>(`/match/candidates${qs}`, { token });
+    },
+    enabled: !!token,
+  });
+
+  const queryClient = useQueryClient();
+  const actionMutation = useMutation({
+    mutationFn: (data: { targetId: string; action: "ACCEPTED" | "REJECTED" }) =>
+      apiFetch("/match/action", {
+        method: "POST",
+        body: JSON.stringify(data),
+        token,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["candidates"] });
+    },
+  });
+
+  const candidates = candidatesResp?.candidates || candidatesResp?.data || candidatesResp || [];
+
+  return (
+    <div className="max-w-3xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="font-display font-semibold text-[24px] text-ink tracking-tight">
+            Discover
+          </h1>
+          <p className="text-[14px] text-muted mt-1">
+            Find developers who share your interests.
+          </p>
         </div>
+        <div className="flex gap-2">
+          {INTENTS.map((intent) => (
+            <button
+              key={intent.id}
+              onClick={() => setActiveIntent(intent.id)}
+              className={`px-3 py-1.5 rounded-full text-[12px] font-medium transition-colors duration-fast ${
+                activeIntent === intent.id
+                  ? "bg-primary text-white"
+                  : "bg-surface text-muted hover:text-ink hover:bg-border"
+              }`}
+            >
+              {intent.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        {candidates.length === 0 ? (
+          <div className="text-center py-12 bg-bg border border-border rounded-xl">
+            <h3 className="text-ink font-medium">No more candidates</h3>
+            <p className="text-muted text-[13px] mt-1">Check back later for more profiles.</p>
+          </div>
+        ) : (
+          candidates.map((candidate: any, index: number) => (
+            <CandidateCard
+              key={candidate.userId || index}
+              candidate={candidate}
+              profile={profile}
+              index={index}
+              actionMutation={actionMutation}
+            />
+          ))
+        )}
       </div>
     </div>
   );

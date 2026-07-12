@@ -114,3 +114,41 @@ export async function getRankedCandidates(
 		totalAvailable: finalCandidates.length,
 	};
 }
+
+// Pure similarity (Explore tab)
+export async function getSimilarCandidates(
+  requesterId: string,
+  page: number,
+  limit: number
+): Promise<RankerResponse> {
+  const [allProfiles, seenIds] = await Promise.all([
+    getAllMatchProfiles(),
+    getSeenIds(requesterId, 'ALL')   // global seen, not intent-specific
+  ])
+
+  const requester = allProfiles.find(p => p.userId === requesterId)
+  if (!requester) return { candidates: [], relaxed: false, totalAvailable: 0 }
+
+  const scored = allProfiles.map(p => ({
+    ...p,
+    similarityScore: calculateCosineSimilarity(requester.skillVector, p.skillVector)
+  }))
+
+  // Minimal filters only — no intent, no rating
+  const filtered = scored.filter(c =>
+    c.userId !== requesterId &&
+    !seenIds.has(c.userId) &&
+    c.profileScore >= 30 &&
+    c.availability !== 'BUSY' &&
+    c.similarityScore >= 0.20
+  )
+
+  filtered.sort((a, b) => b.similarityScore - a.similarityScore)
+
+  const start = (page - 1) * limit
+  return {
+    candidates:     filtered.slice(start, start + limit),
+    relaxed:        false,
+    totalAvailable: filtered.length
+  }
+}

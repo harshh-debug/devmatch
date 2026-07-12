@@ -370,10 +370,11 @@ Response --> Client
 
 # 🔄 Complete Request Lifecycle
 
-The Match Service is optimized around two primary workflows:
+The Match Service is optimized around three primary workflows:
 
-1. **Candidate Discovery** — generating a ranked recommendation feed.
-2. **Swipe Resolution** — recording user actions and creating mutual matches.
+1. **Candidate Discovery (Intent-Based)** — generating a ranked feed filtered by intent and rating (`/candidates`).
+2. **Candidate Discovery (Explore)** — generating a ranked feed based purely on global similarity (`/similar`).
+3. **Swipe Resolution** — recording user actions and creating mutual matches.
 
 Both workflows are designed to keep the API latency extremely low while maintaining consistency across distributed services.
 
@@ -572,11 +573,11 @@ Candidates are filtered according to:
 
 | Filter | Description |
 |---------|-------------|
-| Intent | Same intent |
+| Intent | Same intent (Only for `/candidates`) |
 | Availability | User must be available |
-| Rating Range | Must fall inside configured range |
+| Rating Range | Must fall inside configured range (Only for `/candidates`) |
 | Similarity | Minimum similarity threshold |
-| Seen History | Must not already be swiped |
+| Seen History | Must not already be swiped (Checked against global seen list for `/similar`) |
 
 Only candidates passing every filter continue.
 
@@ -671,7 +672,7 @@ participant Redis
 
 participant Engine
 
-Client->>Gateway: GET /match/candidates
+Client->>Gateway: GET /match/candidates (or /similar)
 
 Gateway->>Controller: Forward Request
 

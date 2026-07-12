@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { getRankedCandidates } from "../services/engine/ranker";
+import { getRankedCandidates, getSimilarCandidates } from "../services/engine/ranker";
 import type { IntentType } from "db/client";
 
 export const getCandidates = async (req: Request, res: Response) => {
@@ -40,6 +40,27 @@ export const getCandidates = async (req: Request, res: Response) => {
 
     } catch (error) {
         console.error("[getCandidates Handler] Error:", error);
+        return res.status(500).json({ success: false, message: "Internal Server Error" });
+    }
+};
+
+export const getSimilar = async (req: Request, res: Response) => {
+    try {
+        const requesterId = req.user!.id;
+        
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
+
+        const result = await getSimilarCandidates(
+            requesterId,
+            page,
+            limit
+        );
+
+        return res.status(200).json({ success: true, data: result });
+
+    } catch (error) {
+        console.error("[getSimilar Handler] Error:", error);
         return res.status(500).json({ success: false, message: "Internal Server Error" });
     }
 };

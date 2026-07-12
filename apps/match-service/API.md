@@ -9,7 +9,7 @@ This document is intended for frontend developers, backend integrations, and AI 
 # Base URL
 
 ```text
-/api/match
+/api/v1/match
 ```
 
 ---
@@ -124,7 +124,7 @@ Returns a ranked list of recommended developers.
 ## Example Request
 
 ```http
-GET /match/candidates?intentType=DSA&ratingMin=1400&ratingMax=1600
+GET /api/v1/match/candidates?intentType=DSA&ratingMin=1400&ratingMax=1600
 ```
 
 ---
@@ -176,6 +176,42 @@ GET /match/candidates?intentType=DSA&ratingMin=1400&ratingMax=1600
 
 ---
 
+# GET /similar
+
+Returns a ranked list of recommended developers based purely on vector similarity (Explore Tab).
+No intent or rating filters are applied.
+
+## Query Parameters
+
+| Parameter | Type | Required | Description |
+|------------|------|----------|-------------|
+| limit | number | ❌ | Default 20 (max 50) |
+| page | number | ❌ | Default 1 |
+
+---
+
+## Example Request
+
+```http
+GET /api/v1/match/similar
+```
+
+---
+
+## Success Response
+
+Same structure as `/candidates`.
+
+---
+
+## Error Codes
+
+| Status | Description |
+|---------|-------------|
+| 500 | Internal server error |
+
+---
+
 # POST /action
 
 Records a swipe action on another user.
@@ -199,7 +235,7 @@ If both users have accepted each other, a match is created.
 ## Example Request
 
 ```http
-POST /match/action
+POST /api/v1/match/action
 ```
 
 ---
@@ -247,8 +283,7 @@ POST /match/action
 
 | Status | Description |
 |---------|-------------|
-| 400 | Invalid request |
-| 409 | Cannot swipe on yourself |
+| 400 | Invalid request / Cannot swipe on yourself |
 | 500 | Internal server error |
 
 ---
@@ -262,7 +297,7 @@ Returns incoming connection requests that the current user has not responded to.
 ## Example Request
 
 ```http
-GET /match/requests
+GET /api/v1/match/requests
 ```
 
 ---
@@ -279,6 +314,13 @@ GET /match/requests
         "username": "saumya_dev",
         "displayName": "Saumya",
         "avatarUrl": "https://...",
+        "college": "NIT",
+        "profileScore": 85,
+        "cfRating": 1450,
+        "skillTags": [
+          "React",
+          "Node.js"
+        ],
         "requestedIntent": "HACKATHON",
         "requestedAt": "2026-06-30T10:00:00Z"
       }
@@ -305,18 +347,10 @@ Used for Conversations and Chat screens.
 
 ---
 
-## Query Parameters
-
-| Parameter | Type | Required | Description |
-|------------|------|----------|-------------|
-| intentType | IntentType | ❌ | Filter by intent |
-
----
-
 ## Example Request
 
 ```http
-GET /match/matches?intentType=DSA
+GET /api/v1/match/matches
 ```
 
 ---
@@ -413,7 +447,6 @@ Done      Match Created
 | 200 | Success |
 | 201 | Resource created (Mutual match) |
 | 400 | Invalid request |
-| 409 | Business conflict |
 | 500 | Internal server error |
 
 ---
