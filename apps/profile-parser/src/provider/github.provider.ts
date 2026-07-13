@@ -39,13 +39,14 @@ export const githubProvider = {
 				.map(([lang]) => lang);
 
 			// 3. Fetch Contribution Streak via GraphQL
-			const streak = await this.fetchContributionStreak(username);
+			const contributionCalendar = await this.fetchContributionCalendar(username);
 
 			return {
 				githubStars: totalStars,
 				topLanguages,
 				inferredTopics: Array.from(topics),
-				contributionStreak: streak,
+				contributionStreak: contributionCalendar.streak,
+				githubContributions: contributionCalendar.weeks,
 			};
 		} catch (error: any) {
 			throw new Error(
@@ -54,7 +55,7 @@ export const githubProvider = {
 		}
 	},
 
-	async fetchContributionStreak(username: string): Promise<number> {
+	async fetchContributionCalendar(username: string): Promise<{ streak: number; weeks: { days: { date: string; count: number }[] }[] }> {
 		const query = `
             query($username: String!) {
                 user(login: $username) {
@@ -73,11 +74,12 @@ export const githubProvider = {
         `;
 		try {
 			const response: any = await octokit.graphql(query, { username });
-			const weeks =
-				response.user.contributionsCollection.contributionCalendar.weeks;
+			const weeks = response.user.contributionsCollection.contributionCalendar.weeks.map((week: any) => ({
+				days: week.contributionDays.map((day: any) => ({ date: day.date, count: day.contributionCount })),
+			}));
 
 			let currentStreak = 0;
-			const days = weeks.flatMap((w: any) => w.contributionDays).reverse();
+			const days = weeks.flatMap((week: any) => week.days).reverse();
 
 			// Calculate active streak counting backwards from today
 			for (const day of days) {
@@ -88,9 +90,9 @@ export const githubProvider = {
 					if (currentStreak > 0) break;
 				}
 			}
-			return currentStreak;
+			return { streak: currentStreak, weeks };
 		} catch {
-			return 0; // Graceful fallback if GraphQL fails
+			return { streak: 0, weeks: [] }; // Graceful fallback if GraphQL fails
 		}
 	},
 };

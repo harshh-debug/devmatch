@@ -82,7 +82,9 @@ export async function getRankedCandidates(
 		if (relaxedCandidates.length > 0) isRelaxed = true;
 	}
 
-	// 7. Attempt 3: Maximum Relaxation (Drop ratings entirely, lower similarity)
+	// 7. Attempt 3: Maximum Relaxation. The candidate pool can be small (or
+	// seeded with sparse vectors), so rank every otherwise eligible profile
+	// instead of turning a working Discover feed into an empty screen.
 	if (finalCandidates.length < limit) {
 		const allIncludedIds = new Set(finalCandidates.map((c) => c.userId));
 
@@ -90,7 +92,7 @@ export async function getRankedCandidates(
 			...baseRules,
 			ratingMin: undefined,
 			ratingMax: undefined,
-			minSimilarityScore: 0.2,
+			minSimilarityScore: -1,
 		};
 
 		const maxRelaxedCandidates = applyHardFilters(scoredPool, maxRelaxedRules)
@@ -134,13 +136,14 @@ export async function getSimilarCandidates(
     similarityScore: calculateCosineSimilarity(requester.skillVector, p.skillVector)
   }))
 
-  // Minimal filters only — no intent, no rating
+  // Explore is a ranked browsing feed. Keep all otherwise eligible profiles in
+  // small or sparse-vector pools instead of applying a hard score cutoff.
   const filtered = scored.filter(c =>
     c.userId !== requesterId &&
     !seenIds.has(c.userId) &&
     c.profileScore >= 30 &&
     c.availability !== 'BUSY' &&
-    c.similarityScore >= 0.20
+    c.similarityScore >= -1
   )
 
   filtered.sort((a, b) => b.similarityScore - a.similarityScore)

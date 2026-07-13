@@ -14,7 +14,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { io, type Socket } from "socket.io-client";
 
 const CHAT_URL =
-  process.env.NEXT_PUBLIC_CHAT_URL ?? "ws://localhost:3004";
+  process.env.NEXT_PUBLIC_CHAT_URL ?? "ws://localhost:3005";
 
 export interface ChatMessage {
   id: string;
@@ -29,6 +29,8 @@ export interface ChatMessage {
   clientMessageId?: string;
   status?: "sent" | "delivered" | "read";
 }
+
+const EMPTY_MESSAGES: ChatMessage[] = [];
 
 interface UseChatOptions {
   roomId: string;
@@ -70,7 +72,7 @@ function getSocket(token: string): Socket {
 export function useChat({
   roomId,
   token,
-  initialMessages = [],
+  initialMessages = EMPTY_MESSAGES,
 }: UseChatOptions): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [peerOnline, setPeerOnline] = useState(false);
@@ -82,10 +84,9 @@ export function useChat({
 
   // Sync initial messages when REST data loads.
   useEffect(() => {
-    if (initialMessages.length > 0) {
-      setMessages(initialMessages);
-    }
-  }, [initialMessages.length]);
+    // A new room must never render messages carried over from the previous room.
+    setMessages(initialMessages);
+  }, [roomId, initialMessages]);
 
   useEffect(() => {
     if (!token || !roomId) return;

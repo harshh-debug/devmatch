@@ -14,6 +14,8 @@ export const userRouter = Router();
 userRouter.get('/users/me', extractUser, profileHandler.getMe);
 userRouter.patch('/users/me', extractUser, profileHandler.updateMe);
 userRouter.patch('/users/me/skills', extractUser, profileHandler.updateSkills);
+userRouter.get('/users/search', extractUser, profileHandler.searchUsers);
+userRouter.get('/users/username-availability', extractUser, profileHandler.checkUsername);
 
 // Intent Management
 userRouter.get('/users/me/intent', extractUser, intentHandler.getIntent);

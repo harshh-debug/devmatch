@@ -30,7 +30,7 @@ function ChatRoomListItem({ room }: { room: any }) {
           }}
           aria-hidden="true"
         >
-          {user.avatarUrl ? "IMG" : (user.displayName?.charAt(0) || "U")}
+          {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" /> : (user.displayName?.charAt(0) || "U")}
         </div>
       </div>
       <div className="flex-1 min-w-0">
@@ -59,15 +59,17 @@ export default function ChatListPage() {
   const token = useToken();
   const [search, setSearch] = useState("");
 
-  const { data: rooms = [] } = useQuery({
+  const { data: roomsResp } = useQuery({
     queryKey: ["chat", "rooms"],
     queryFn: () => apiFetch<any[]>("/chat/rooms", { token }),
     enabled: !!token,
+    refetchInterval: 5000, // Poll for new rooms after a match
   });
 
+  const rooms: any[] = roomsResp ?? [];
 
   const filtered = rooms.filter((r) =>
-    r.name?.toLowerCase()?.includes(search.toLowerCase()) ?? true
+    !search || r.otherUserId?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (

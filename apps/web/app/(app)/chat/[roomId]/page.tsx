@@ -9,6 +9,32 @@ import { useToken } from "@/hooks/useToken";
 import { useChat, type ChatMessage } from "@/hooks/useChat";
 import { useSession } from "next-auth/react";
 
+function ChatSidebarItem({ room, active, token }: { room: any; active: boolean; token: string | undefined }) {
+  const { data: user } = useQuery({
+    queryKey: ["users", "public", room.otherUserId],
+    queryFn: () => apiFetch<any>(`/users/public/${room.otherUserId}`, { token }),
+    enabled: !!token && !!room.otherUserId,
+  });
+
+  const name = user?.displayName ?? user?.username ?? "Loading…";
+  return (
+    <Link
+      href={`/chat/${room.id}`}
+      className={`flex items-center gap-3 px-4 py-3.5 hover:bg-surface transition-colors duration-fast border-b border-border/50 ${
+        active ? "bg-surface" : ""
+      }`}
+    >
+      <div className="w-9 h-9 rounded-full bg-ink/10 flex items-center justify-center text-[10px] font-semibold text-ink shrink-0">
+        {user?.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" /> : (user?.displayName?.[0] ?? user?.username?.[0] ?? "U")}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-medium text-ink truncate">{name}</p>
+        <p className="text-[11px] text-muted truncate">{room.lastMessage?.content ?? "No messages yet"}</p>
+      </div>
+    </Link>
+  );
+}
+
 export default function ChatRoomPage() {
   const token = useToken();
   const { data: session } = useSession();
@@ -21,21 +47,25 @@ export default function ChatRoomPage() {
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── REST: room list (sidebar) ──────────────────────────────────
-  const { data: rooms = [] } = useQuery({
+  const { data: roomsResp } = useQuery({
     queryKey: ["chat", "rooms"],
     queryFn: () => apiFetch<any[]>("/chat/rooms", { token }),
     enabled: !!token,
+    refetchInterval: 5000,
   });
 
+  const rooms: any[] = roomsResp ?? [];
+
   // ── REST: room metadata ────────────────────────────────────────
-  const { data: roomInfo } = useQuery({
-    queryKey: ["chat", "room", roomId],
-    queryFn: () => apiFetch<any>(`/chat/rooms/${roomId}`, { token }),
-    enabled: !!token && !!roomId,
+  const selectedRoom = rooms.find((room) => room.id === roomId);
+  const { data: otherUser } = useQuery({
+    queryKey: ["users", "public", selectedRoom?.otherUserId],
+    queryFn: () => apiFetch<any>(`/users/public/${selectedRoom!.otherUserId}`, { token }),
+    enabled: !!token && !!selectedRoom?.otherUserId,
   });
 
   // ── REST: initial message page (cursor pagination) ─────────────
-  const { data: messagesData } = useQuery({
+  const { data: messagesResp } = useQuery({
     queryKey: ["chat", "messages", roomId],
     queryFn: () =>
       apiFetch<{ messages: ChatMessage[]; nextCursor: string | null }>(
@@ -44,6 +74,8 @@ export default function ChatRoomPage() {
       ),
     enabled: !!token && !!roomId,
   });
+
+  const initialMessages = messagesResp?.messages;
 
   // ── Socket.io real-time layer ──────────────────────────────────
   const {
@@ -58,10 +90,10 @@ export default function ChatRoomPage() {
   } = useChat({
     roomId,
     token,
-    initialMessages: messagesData?.messages ?? [],
+    initialMessages,
   });
 
-  const OTHER_USER = roomInfo?.matchedUser ?? {
+  const OTHER_USER = otherUser ?? {
     id: "",
     name: "Loading...",
     online: false,
@@ -109,25 +141,12 @@ export default function ChatRoomPage() {
         </div>
         <div className="flex-1 overflow-y-auto">
           {rooms.map((room) => (
-            <Link
+            <ChatSidebarItem
               key={room.id}
-              href={`/chat/${room.id}`}
-              className={`flex items-center gap-3 px-4 py-3.5 hover:bg-surface transition-colors duration-fast border-b border-border/50 ${
-                room.id === roomId ? "bg-surface" : ""
-              }`}
-            >
-              <div className="w-9 h-9 rounded-full bg-ink/10 flex items-center justify-center text-[10px] font-semibold text-ink shrink-0">
-                {room.avatar || "U"}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium text-ink truncate">
-                  {room.name || room.matchedUser?.displayName || "User"}
-                </p>
-                <p className="text-[11px] text-muted truncate">
-                  {room.lastMessage || "..."}
-                </p>
-              </div>
-            </Link>
+              room={room}
+              active={room.id === roomId}
+              token={token}
+            />
           ))}
         </div>
       </div>
@@ -156,7 +175,7 @@ export default function ChatRoomPage() {
                 }}
                 aria-hidden="true"
               >
-                {OTHER_USER.avatar ?? OTHER_USER.displayName?.[0] ?? "U"}
+                {OTHER_USER.avatarUrl ? <img src={OTHER_USER.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" /> : (OTHER_USER.displayName?.[0] ?? "U")}
               </div>
               {(peerOnline || OTHER_USER.online) && (
                 <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-success border-2 border-bg" />
@@ -193,7 +212,7 @@ export default function ChatRoomPage() {
             )}
             {OTHER_USER.username && (
               <Link
-                href={`/u/${OTHER_USER.username}`}
+                href={`/u/${OTHER_USER.id}`}
                 className="text-[11px] text-primary hover:text-primary-hover font-medium transition-colors shrink-0"
               >
                 View profile

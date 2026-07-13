@@ -24,19 +24,13 @@ export function CompletenessWidget({ completeness, missingFields }: Completeness
       {missingFields.length > 0 && (
         <div className="space-y-2 mt-4 pt-4 border-t border-[#262626]">
           {missingFields.map((field) => (
-            <button
+            <a
               key={field.label}
-              onClick={() => {
-                const el = document.getElementById(field.fieldId);
-                if (el) {
-                  el.focus();
-                  el.scrollIntoView({ behavior: "smooth", block: "center" });
-                }
-              }}
+              href={`/settings#${field.fieldId}`}
               className="block w-full text-left text-[12px] text-[#A1A1AA] hover:text-white transition-colors"
             >
               + {field.label} <span className="text-[#52525B]">(+{field.pts} pts)</span>
-            </button>
+            </a>
           ))}
         </div>
       )}

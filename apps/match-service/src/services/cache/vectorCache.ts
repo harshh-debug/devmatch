@@ -50,6 +50,12 @@ export async function warmVectorCache(): Promise<void> {
 
 		const matchProfile: MatchProfile = {
 			userId: p.userId,
+			username: p.user.username,
+			displayName: p.user.displayName,
+			avatarUrl: p.user.avatarUrl,
+			college: p.user.college,
+			skillTags: p.skillTags,
+			lcRating: p.lcRating,
 			skillVector: p.skillVector,
 			activeIntents: activeIntents,
 			availability: p.user.availability,
@@ -92,6 +98,12 @@ export async function getAllMatchProfiles(): Promise<MatchProfile[]> {
 			.filter((p) => !p.skillVector.every((v) => v === 0))
 			.map((p) => ({
 				userId: p.userId,
+				username: p.user.username,
+				displayName: p.user.displayName,
+				avatarUrl: p.user.avatarUrl,
+				college: p.user.college,
+				skillTags: p.skillTags,
+				lcRating: p.lcRating,
 				skillVector: p.skillVector,
 				activeIntents: p.user.intents.map((i) => i.intentType as IntentType),
 				availability: p.user.availability,

@@ -13,6 +13,7 @@ export interface AuthUser {
   id: string;
   email: string;
   username: string;
+  avatarUrl?: string | null;
 }
 
 /** Full user profile returned by GET /me and GET /users/:username. */
@@ -20,6 +21,7 @@ export interface UserProfile {
   id: string;
   email: string;
   username: string;
+  avatarUrl?: string | null;
   displayName?: string;
   bio?: string;
   college?: string;
@@ -29,9 +31,19 @@ export interface UserProfile {
   skillTags: string[];
   intentType?: IntentType;
   leetcodeHandle?: string;
+  githubUsername?: string;
   githubHandle?: string;
   codeforcesHandle?: string;
   cfRating?: number;
+  lcRating?: number;
+  githubContributions?: { days: { date: string; count: number }[] }[];
+  lcTotalSolved?: number;
+  lcEasySolved?: number;
+  lcMediumSolved?: number;
+  lcHardSolved?: number;
+  githubStars?: number;
+  contributionStreak?: number;
+  topLanguages?: string[];
   profileCompleteness?: number;
   /** Language usage percentages, e.g. { TypeScript: 62, Rust: 24 }. */
   languages?: Record<string, number>;

@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/apiClient";
 import type { UserProfile } from "@/lib/types";
+import AppShellLayout from "@/app/(app)/layout";
 
 function initials(name?: string) {
   if (!name) return "?";
@@ -19,6 +20,19 @@ function initials(name?: string) {
     .toUpperCase();
 }
 
+function ContributionGraph({ weeks }: { weeks?: { days: { date: string; count: number }[] }[] }) {
+  if (!weeks?.length) return <p className="mt-4 text-[11px] text-muted">Contribution history will appear after the next GitHub sync.</p>;
+  const days = weeks.flatMap((week) => week.days);
+  const max = Math.max(...days.map((day) => day.count), 1);
+  return (
+    <div className="mt-4 pt-3 border-t border-border">
+      <p className="text-[10px] text-muted mb-2">CONTRIBUTIONS · LAST YEAR</p>
+      <div className="grid grid-flow-col grid-rows-7 gap-1 overflow-x-auto pb-1">
+        {weeks.map((week, index) => <div key={index} className="grid grid-rows-7 gap-1">{week.days.map((day) => <span key={day.date} title={`${day.date}: ${day.count} contributions`} className="w-2.5 h-2.5 rounded-[2px]" style={{ backgroundColor: day.count ? `color-mix(in oklch, var(--color-primary) ${20 + Math.round((day.count / max) * 80)}%, var(--color-surface))` : "var(--color-surface)" }} />)}</div>)}</div>
+    </div>
+  );
+}
+
 export default function PublicProfilePage() {
   const params = useParams();
   const router = useRouter();
@@ -29,12 +43,19 @@ export default function PublicProfilePage() {
   const { data: profile, isLoading, error } = useQuery({
     queryKey: ["users", "public", username],
     queryFn: () =>
-      apiFetch<UserProfile>(`/users/${encodeURIComponent(username)}`, {
+      apiFetch<UserProfile>(`/users/public/${encodeURIComponent(username)}`, {
         // Public profile endpoint; send token if we have one.
         token: session?.accessToken,
       }),
     retry: 0,
   });
+
+  const { data: rooms = [] } = useQuery({
+    queryKey: ["chat", "rooms"],
+    queryFn: () => apiFetch<{ otherUserId: string }[]>("/chat/rooms", { token: session?.accessToken }),
+    enabled: !!session?.accessToken,
+  });
+  const isConnected = !!profile && rooms.some((room) => room.otherUserId === profile.id);
 
   const languages = profile?.languages
     ? Object.entries(profile.languages).map(([name, percentage]) => ({
@@ -71,7 +92,7 @@ export default function PublicProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg">
+    <AppShellLayout><div className="min-h-screen bg-bg">
       {/* Simple header */}
       <header className="flex items-center justify-between px-5 sm:px-8 h-16 border-b border-border">
         <a
@@ -102,7 +123,7 @@ export default function PublicProfilePage() {
               }}
               aria-hidden="true"
             >
-              {initials(profile.displayName)}
+              {profile.avatarUrl ? <img src={profile.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" /> : initials(profile.displayName)}
             </div>
             <div className="text-center sm:text-left flex-1">
               <h1 className="font-display font-semibold text-[24px] text-ink tracking-tight">
@@ -113,12 +134,16 @@ export default function PublicProfilePage() {
                 <span className="text-[11px] text-muted">@{profile.username}</span>
               </div>
             </div>
-            <button
-              onClick={handleConnect}
-              className="px-5 py-2.5 text-[13px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast shrink-0"
-            >
-              Connect
-            </button>
+            {isConnected ? (
+              <span className="px-4 py-2 text-[12px] font-medium rounded-lg border border-success/30 bg-success/10 text-success shrink-0">Connected</span>
+            ) : (
+              <button
+                onClick={handleConnect}
+                className="px-5 py-2.5 text-[13px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast shrink-0"
+              >
+                Connect
+              </button>
+            )}
           </div>
 
           {/* Bio */}
@@ -158,7 +183,7 @@ export default function PublicProfilePage() {
                 </svg>
                 <span className="text-[13px] font-medium text-ink">GitHub</span>
                 <span className="text-[11px] text-muted ml-auto">
-                  {profile.githubHandle ? `@${profile.githubHandle}` : "Not connected"}
+                  {profile.githubUsername ?? profile.githubHandle ? `@${profile.githubUsername ?? profile.githubHandle}` : "Not connected"}
                 </span>
               </div>
               {languages.length > 0 ? (
@@ -188,6 +213,11 @@ export default function PublicProfilePage() {
               ) : (
                 <p className="text-[11px] text-muted">No language data synced yet.</p>
               )}
+              <div className="grid grid-cols-2 gap-3 mt-4 pt-3 border-t border-border">
+                <div><p className="text-[10px] text-muted">CONTRIBUTION STREAK</p><p className="font-mono text-[18px] text-ink">{profile.contributionStreak ?? "—"}</p></div>
+                <div><p className="text-[10px] text-muted">GITHUB STARS</p><p className="font-mono text-[18px] text-ink">{profile.githubStars ?? "—"}</p></div>
+              </div>
+              <ContributionGraph weeks={profile.githubContributions} />
             </div>
 
             {/* Codeforces / competitive */}
@@ -219,6 +249,17 @@ export default function PublicProfilePage() {
                       : "—"}
                   </p>
                 </div>
+              </div>
+            </div>
+
+            <div className="border border-border rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[13px] font-medium text-ink">LeetCode</span>
+                <span className="font-mono text-[13px] text-ink">#{profile.lcRating ?? "—"}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><p className="text-[10px] text-muted">TOTAL SOLVED</p><p className="font-mono text-[18px] text-ink">{profile.lcTotalSolved ?? "—"}</p></div>
+                <div><p className="text-[10px] text-muted">EASY / MED / HARD</p><p className="font-mono text-[13px] text-ink">{[profile.lcEasySolved, profile.lcMediumSolved, profile.lcHardSolved].map((value) => value ?? "—").join(" / ")}</p></div>
               </div>
             </div>
           </div>
@@ -253,6 +294,6 @@ export default function PublicProfilePage() {
           </div>
         )}
       </main>
-    </div>
+    </div></AppShellLayout>
   );
 }

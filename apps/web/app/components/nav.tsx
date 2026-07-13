@@ -20,7 +20,7 @@ export default function Nav() {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-sticky transition-all duration-normal backdrop-blur-xl border-b ${
+      className={`fixed top-0 left-0 right-0 z-[200] pointer-events-auto transition-all duration-normal backdrop-blur-xl border-b ${
         scrolled ? "bg-bg/95 border-border" : "bg-bg/80 border-transparent"
       }`}
     >

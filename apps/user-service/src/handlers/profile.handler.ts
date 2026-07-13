@@ -8,6 +8,16 @@ import {
 } from "../validators/user.validators";
 import { publish, TOPICS } from "@devmatch/kafka";
 
+function toPublicProfile(user: NonNullable<Awaited<ReturnType<typeof profileService.getProfileByUserId>>>) {
+	const { email, password, githubId, profile, ...identity } = user;
+	const { skillVector, ...metrics } = profile ?? {};
+	return {
+		...identity,
+		...metrics,
+		profileCompleteness: profile?.profileScore,
+	};
+}
+
 export const profileHandler = {
 	async getMe(req: Request, res: Response, next: NextFunction) {
 		try {
@@ -47,10 +57,29 @@ export const profileHandler = {
 				return res.status(404).json({ message: "User not found" });
 			}
 
-			
-			const { email, password, githubId, ...publicUser } = user;
+			res.json(toPublicProfile(user));
+		} catch (error) {
+			next(error);
+		}
+	},
 
-			res.json(publicUser);
+	async searchUsers(req: Request, res: Response, next: NextFunction) {
+		try {
+			const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+			if (query.length < 2) return res.json([]);
+
+			const users = await profileService.searchPublicProfiles(query);
+			res.json(users.map(toPublicProfile));
+		} catch (error) {
+			next(error);
+		}
+	},
+
+	async checkUsername(req: Request, res: Response, next: NextFunction) {
+		try {
+			const username = typeof req.query.username === "string" ? req.query.username.trim() : "";
+			if (username.length < 3) return res.json({ available: false });
+			res.json({ available: await profileService.isUsernameAvailable(username, req.user!.id) });
 		} catch (error) {
 			next(error);
 		}

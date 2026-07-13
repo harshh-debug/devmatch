@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const updateMeSchema = z.object({
+  username: z.string().trim().min(3).max(30).regex(/^[a-zA-Z0-9_]+$/).optional(),
   displayName: z.string().min(2).optional(),
   bio: z.string().max(500).optional(),
   college: z.string().optional(),

@@ -33,6 +33,7 @@ export const profileUpdater = {
             data: {
                 githubStars: fetchedData.githubStars,
                 contributionStreak: fetchedData.contributionStreak,
+                githubContributions: fetchedData.githubContributions,
                 topLanguages: fetchedData.topLanguages,
                 skillTags: mergedTags,
                 skillVector: newVector, 

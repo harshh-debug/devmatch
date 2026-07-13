@@ -8,6 +8,12 @@ export type Availability = "ACTIVE" | "OPEN" | "BUSY";
  */
 export interface MatchProfile {
     userId: string;
+    username?: string;
+    displayName?: string;
+    avatarUrl?: string | null;
+    college?: string | null;
+    skillTags?: string[];
+    lcRating?: number | null;
     skillVector: number[];
     activeIntents: IntentType[]; 
     availability: Availability;

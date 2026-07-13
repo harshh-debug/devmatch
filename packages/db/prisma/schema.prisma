@@ -76,6 +76,7 @@ model Profile {
     skillTags          String[]
     githubStars        Int       @default(0)
     contributionStreak Int       @default(0)
+    githubContributions Json?
     lcRating           Int?
     cfRating           Int?
     skillVector        Float[]

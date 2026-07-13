@@ -46,7 +46,7 @@ export default function MatchesPage() {
                   }}
                   aria-hidden="true"
                 >
-                  {user?.avatarUrl ? "IMG" : (user?.displayName?.charAt(0) || "U")}
+                  {user?.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" /> : (user?.displayName?.charAt(0) || "U")}
                 </div>
               </div>
               <div className="flex-1 min-w-0">

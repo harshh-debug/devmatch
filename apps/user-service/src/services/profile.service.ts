@@ -9,6 +9,25 @@ export const profileService = {
     });
   },
 
+  async searchPublicProfiles(query: string, limit = 10) {
+    return prismaClient.user.findMany({
+      where: {
+        OR: [
+          { username: { contains: query, mode: "insensitive" } },
+          { displayName: { contains: query, mode: "insensitive" } },
+        ],
+      },
+      include: { profile: true },
+      orderBy: { username: "asc" },
+      take: limit,
+    });
+  },
+
+  async isUsernameAvailable(username: string, userId: string) {
+    const existing = await prismaClient.user.findUnique({ where: { username } });
+    return !existing || existing.id === userId;
+  },
+
   async updateUser(userId: string, data: Prisma.UserUpdateInput) {
     // Prisma automatically ignores undefined fields, enabling clean partial updates
     return prismaClient.user.update({

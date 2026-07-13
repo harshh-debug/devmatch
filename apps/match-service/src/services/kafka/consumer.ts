@@ -41,6 +41,12 @@ async function syncUserCache(userId: string) {
 
 		const matchProfile: MatchProfile = {
 			userId: p.userId,
+			username: p.user.username,
+			displayName: p.user.displayName,
+			avatarUrl: p.user.avatarUrl,
+			college: p.user.college,
+			skillTags: p.skillTags,
+			lcRating: p.lcRating,
 			skillVector: p.skillVector,
 			activeIntents: activeIntents,
 			availability: p.user.availability,
