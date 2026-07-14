@@ -35,6 +35,7 @@ const EMPTY_MESSAGES: ChatMessage[] = [];
 interface UseChatOptions {
   roomId: string;
   token: string | undefined;
+  peerUserId?: string;
   /** Messages loaded from REST API (initial page). */
   initialMessages?: ChatMessage[];
   /** Called when a new mutual match notification arrives (optional). */
@@ -72,6 +73,7 @@ function getSocket(token: string): Socket {
 export function useChat({
   roomId,
   token,
+  peerUserId,
   initialMessages = EMPTY_MESSAGES,
 }: UseChatOptions): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
@@ -166,8 +168,9 @@ export function useChat({
 
     // ── Presence ──────────────────────────────────────────────────
     const onPresence = (data: { userId: string; online: boolean }) => {
-      // We don't know peer's userId here without extra context; component can handle.
-      setPeerOnline(data.online);
+      if (data.userId === peerUserId) {
+        setPeerOnline(data.online);
+      }
     };
 
     socket.on("connect", onConnect);
@@ -196,7 +199,7 @@ export function useChat({
       socket.off("presence:status", onPresence);
       socket.emit("chat:room:leave", { roomId });
     };
-  }, [roomId, token]);
+  }, [roomId, token, peerUserId]);
 
   const sendMessage = useCallback(
     (content: string, type: "TEXT" | "CODE_SNIPPET" | "LINK" = "TEXT") => {

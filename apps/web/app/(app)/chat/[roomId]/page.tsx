@@ -90,6 +90,7 @@ export default function ChatRoomPage() {
   } = useChat({
     roomId,
     token,
+    peerUserId: selectedRoom?.otherUserId,
     initialMessages,
   });
 

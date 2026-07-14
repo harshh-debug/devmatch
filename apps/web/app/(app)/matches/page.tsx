@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/apiClient";
 import { useToken } from "@/hooks/useToken";
+import type { ChatRoom } from "@/lib/types";
 
 export default function MatchesPage() {
   const token = useToken();
@@ -13,6 +14,14 @@ export default function MatchesPage() {
     queryFn: () => apiFetch<any[]>("/match/matches", { token }),
     enabled: !!token,
   });
+
+  const { data: rooms = [] } = useQuery({
+    queryKey: ["chat", "rooms"],
+    queryFn: () => apiFetch<ChatRoom[]>("/chat/rooms", { token }),
+    enabled: !!token,
+  });
+
+  const roomIdByMatchId = new Map(rooms.map((room) => [room.matchId, room.id]));
 
   return (
     <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -30,6 +39,7 @@ export default function MatchesPage() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {matches.map((match: any) => {
           const user = match.matchedUser;
+          const roomId = roomIdByMatchId.get(match.matchId);
           return (
           <div
             key={match.matchId}
@@ -70,12 +80,18 @@ export default function MatchesPage() {
             </div>
 
             {/* CTA */}
-            <Link
-              href={`/chat/${match.matchId}`}
-              className="w-full text-center py-2.5 text-[13px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast"
-            >
-              Open Workspace
-            </Link>
+            {roomId ? (
+              <Link
+                href={`/chat/${roomId}`}
+                className="w-full text-center py-2.5 text-[13px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast"
+              >
+                Open Workspace
+              </Link>
+            ) : (
+              <span className="w-full text-center py-2.5 text-[13px] font-medium rounded-lg bg-surface text-muted">
+                Workspace preparing…
+              </span>
+            )}
           </div>
         )})}
       </div>

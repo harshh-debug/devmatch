@@ -16,14 +16,18 @@ export async function GET(request: NextRequest) {
 
   const code = request.nextUrl.searchParams.get("code");
   if (!code) {
-    const clientId = process.env.AUTH_GITHUB_ID;
+    // Account linking uses its own OAuth App because GitHub OAuth Apps permit
+    // only one callback URL. Login continues to use AUTH_GITHUB_* through Auth.js.
+    const clientId = process.env.GITHUB_LINK_ID;
     if (!clientId) return profileRedirect(request, "error");
 
     const state = crypto.randomUUID();
     const authorizeUrl = new URL("https://github.com/login/oauth/authorize");
     authorizeUrl.searchParams.set("client_id", clientId);
     authorizeUrl.searchParams.set("redirect_uri", new URL("/api/github/link", request.url).toString());
-    authorizeUrl.searchParams.set("scope", "read:user user:email repo");
+    // Linking only needs public GitHub identity. Repository parsing is performed
+    // separately from public data with the server-side parser token.
+    authorizeUrl.searchParams.set("scope", "read:user");
     authorizeUrl.searchParams.set("state", state);
 
     const response = NextResponse.redirect(authorizeUrl);
@@ -43,9 +47,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const clientId = process.env.AUTH_GITHUB_ID;
-    const clientSecret = process.env.AUTH_GITHUB_SECRET;
-    if (!clientId || !clientSecret) throw new Error("GitHub OAuth is not configured");
+    const clientId = process.env.GITHUB_LINK_ID;
+    const clientSecret = process.env.GITHUB_LINK_SECRET;
+    if (!clientId || !clientSecret) throw new Error("GitHub account linking is not configured");
 
     const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
       method: "POST",

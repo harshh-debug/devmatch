@@ -1,7 +1,7 @@
 import prismaClient from "db/client";
 import type { Request, Response } from "express";
 import bcrypt from "bcrypt";
-import { getGitHubProfile, resolveUsername, type GitHubUser } from "../services/github.services";
+import { getGitHubIdentity, getGitHubProfile, resolveUsername, type GitHubUser } from "../services/github.services";
 import { issueToken } from "../services/token.service";
 import { generateUsername, safeUser } from "../services/user.service";
 import { profileSyncQueue, type SyncPlatform } from '@devmatch/bullmq';
@@ -251,7 +251,7 @@ export const linkGitHub = async (req: Request, res: Response) => {
         // 2. Fetch the GitHub profile using the provided token
         let githubUser;
         try {
-            githubUser = await getGitHubProfile(accessToken);
+            githubUser = await getGitHubIdentity(accessToken);
         } catch {
             return res.status(401).json({ message: "Invalid GitHub token" });
         }

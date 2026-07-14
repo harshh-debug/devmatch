@@ -7,6 +7,7 @@ import { apiFetch, ApiError } from "@/lib/apiClient";
 import { useToken } from "@/hooks/useToken";
 import type { UserProfile } from "@/lib/types";
 import { CompletenessWidget } from "@/app/components/profile/CompletenessWidget";
+import { GitHubActivity } from "@/app/components/profile/GitHubActivity";
 
 const SKILLS_POOL = [
   "TypeScript",
@@ -271,11 +272,13 @@ export default function ProfilePage() {
           <div className="relative"><input id="searchSkill" value={searchSkill} onChange={(event) => { setSearchSkill(event.target.value); setShowSkillDropdown(true); }} onFocus={() => setShowSkillDropdown(true)} placeholder="Add a skill…" className="w-full px-3.5 py-2 text-[13px] bg-bg border border-border rounded-lg text-ink focus:outline-none focus:border-ring" />{showSkillDropdown && filteredSkills.length > 0 && <div className="absolute z-dropdown left-0 right-0 top-full mt-1 bg-bg border border-border rounded-lg shadow-lg overflow-hidden">{filteredSkills.map((skill) => <button key={skill} onClick={() => addSkill(skill)} className="w-full text-left px-3 py-2 text-[12px] hover:bg-surface">{skill}</button>)}</div>}</div>
           <button onClick={() => saveSkills.mutate()} disabled={saveSkills.isPending} className="mt-3 px-3 py-2 text-[12px] rounded-lg bg-primary text-white disabled:opacity-60">{saveSkills.isPending ? "Saving…" : "Save skills"}</button>
         </section>
-        <div className="grid sm:grid-cols-3 gap-4">
-          <section className="bg-bg border border-border rounded-xl p-5"><h2 className="text-[13px] font-medium text-ink">GitHub</h2><p className="text-[12px] text-muted mt-1">{githubHandle ? `@${githubHandle}` : "Not connected"}</p><div className="grid grid-cols-2 gap-3 mt-4"><div><p className="text-[10px] text-muted">STREAK</p><p className="font-mono text-[18px] text-ink">{profileData?.contributionStreak ?? "—"}</p></div><div><p className="text-[10px] text-muted">STARS</p><p className="font-mono text-[18px] text-ink">{profileData?.githubStars ?? "—"}</p></div></div>{!githubHandle && <a href="/settings#githubHandle" className="inline-block mt-4 text-[12px] text-primary">Connect GitHub</a>}</section>
-          <section className="bg-bg border border-border rounded-xl p-5"><h2 className="text-[13px] font-medium text-ink">LeetCode</h2><p className="text-[12px] text-muted mt-1">{leetcodeHandle ? `@${leetcodeHandle}` : "Not connected"}</p><div className="grid grid-cols-2 gap-3 mt-4"><div><p className="text-[10px] text-muted">GLOBAL RANK</p><p className="font-mono text-[18px] text-ink">{profileData?.lcRating ?? "—"}</p></div><div><p className="text-[10px] text-muted">SOLVED</p><p className="font-mono text-[18px] text-ink">{profileData?.lcTotalSolved ?? "—"}</p></div></div>{!leetcodeHandle && <a href="/settings#leetcodeHandle" className="inline-block mt-4 text-[12px] text-primary">Connect LeetCode</a>}</section>
-          <section className="bg-bg border border-border rounded-xl p-5"><h2 className="text-[13px] font-medium text-ink">Codeforces</h2><p className="text-[12px] text-muted mt-1">{codeforcesHandle ? `@${codeforcesHandle}` : "Not connected"}</p><div className="grid grid-cols-2 gap-3 mt-4"><div><p className="text-[10px] text-muted">RATING</p><p className="font-mono text-[18px] text-ink">{profileData?.cfRating ?? "—"}</p></div><div><p className="text-[10px] text-muted">HANDLE</p><p className="font-mono text-[13px] text-ink truncate">{codeforcesHandle || "—"}</p></div></div>{!codeforcesHandle && <a href="/settings#codeforcesHandle" className="inline-block mt-4 text-[12px] text-primary">Connect Codeforces</a>}</section>
-        </div>
+        {profileData && <div className="space-y-4">
+          <GitHubActivity profile={profileData} />
+          <div className="grid sm:grid-cols-2 gap-4">
+            <section className="bg-bg border border-border rounded-xl p-5"><h2 className="text-[13px] font-medium text-ink">LeetCode</h2><p className="text-[12px] text-muted mt-1">{leetcodeHandle ? `@${leetcodeHandle}` : "Not connected"}</p><div className="grid grid-cols-2 gap-3 mt-4"><div><p className="text-[10px] text-muted">GLOBAL RANK</p><p className="font-mono text-[18px] text-ink">{profileData.lcRating ?? "—"}</p></div><div><p className="text-[10px] text-muted">SOLVED</p><p className="font-mono text-[18px] text-ink">{profileData.lcTotalSolved ?? "—"}</p></div></div>{!leetcodeHandle && <a href="/settings#leetcodeHandle" className="inline-block mt-4 text-[12px] text-primary">Connect LeetCode</a>}</section>
+            <section className="bg-bg border border-border rounded-xl p-5"><h2 className="text-[13px] font-medium text-ink">Codeforces</h2><p className="text-[12px] text-muted mt-1">{codeforcesHandle ? `@${codeforcesHandle}` : "Not connected"}</p><div className="grid grid-cols-2 gap-3 mt-4"><div><p className="text-[10px] text-muted">RATING</p><p className="font-mono text-[18px] text-ink">{profileData.cfRating ?? "—"}</p></div><div><p className="text-[10px] text-muted">HANDLE</p><p className="font-mono text-[13px] text-ink truncate">{codeforcesHandle || "—"}</p></div></div>{!codeforcesHandle && <a href="/settings#codeforcesHandle" className="inline-block mt-4 text-[12px] text-primary">Connect Codeforces</a>}</section>
+          </div>
+        </div>}
       </div>
     );
   }

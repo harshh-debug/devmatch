@@ -8,6 +8,7 @@ import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/apiClient";
 import type { UserProfile } from "@/lib/types";
 import AppShellLayout from "@/app/(app)/layout";
+import { GitHubActivity } from "@/app/components/profile/GitHubActivity";
 
 function initials(name?: string) {
   if (!name) return "?";
@@ -18,19 +19,6 @@ function initials(name?: string) {
     .slice(0, 2)
     .join("")
     .toUpperCase();
-}
-
-function ContributionGraph({ weeks }: { weeks?: { days: { date: string; count: number }[] }[] }) {
-  if (!weeks?.length) return <p className="mt-4 text-[11px] text-muted">Contribution history will appear after the next GitHub sync.</p>;
-  const days = weeks.flatMap((week) => week.days);
-  const max = Math.max(...days.map((day) => day.count), 1);
-  return (
-    <div className="mt-4 pt-3 border-t border-border">
-      <p className="text-[10px] text-muted mb-2">CONTRIBUTIONS · LAST YEAR</p>
-      <div className="grid grid-flow-col grid-rows-7 gap-1 overflow-x-auto pb-1">
-        {weeks.map((week, index) => <div key={index} className="grid grid-rows-7 gap-1">{week.days.map((day) => <span key={day.date} title={`${day.date}: ${day.count} contributions`} className="w-2.5 h-2.5 rounded-[2px]" style={{ backgroundColor: day.count ? `color-mix(in oklch, var(--color-primary) ${20 + Math.round((day.count / max) * 80)}%, var(--color-surface))` : "var(--color-surface)" }} />)}</div>)}</div>
-    </div>
-  );
 }
 
 export default function PublicProfilePage() {
@@ -56,13 +44,6 @@ export default function PublicProfilePage() {
     enabled: !!session?.accessToken,
   });
   const isConnected = !!profile && rooms.some((room) => room.otherUserId === profile.id);
-
-  const languages = profile?.languages
-    ? Object.entries(profile.languages).map(([name, percentage]) => ({
-        name,
-        percentage,
-      }))
-    : [];
 
   if (isLoading) {
     return (
@@ -173,52 +154,9 @@ export default function PublicProfilePage() {
             </div>
           )}
 
-          {/* Metrics panel */}
-          <div className="grid sm:grid-cols-2 gap-4 mb-8">
-            {/* GitHub */}
-            <div className="border border-border rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-ink" aria-hidden="true">
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
-                </svg>
-                <span className="text-[13px] font-medium text-ink">GitHub</span>
-                <span className="text-[11px] text-muted ml-auto">
-                  {profile.githubUsername ?? profile.githubHandle ? `@${profile.githubUsername ?? profile.githubHandle}` : "Not connected"}
-                </span>
-              </div>
-              {languages.length > 0 ? (
-                <div>
-                  <p className="text-[10px] text-muted mb-2">LANGUAGES</p>
-                  <div className="flex h-1.5 rounded-full overflow-hidden mb-2" aria-hidden="true">
-                    {languages.map((lang, i) => (
-                      <div
-                        key={lang.name}
-                        className="h-full"
-                        style={{
-                          width: `${lang.percentage}%`,
-                          backgroundColor: `color-mix(in oklch, var(--color-ink) ${85 - i * 30}%, transparent)`,
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    {languages.map((lang) => (
-                      <div key={lang.name} className="flex items-center gap-1.5">
-                        <span className="text-[11px] text-muted">{lang.name}</span>
-                        <span className="text-[11px] text-muted/70">{lang.percentage}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-[11px] text-muted">No language data synced yet.</p>
-              )}
-              <div className="grid grid-cols-2 gap-3 mt-4 pt-3 border-t border-border">
-                <div><p className="text-[10px] text-muted">CONTRIBUTION STREAK</p><p className="font-mono text-[18px] text-ink">{profile.contributionStreak ?? "—"}</p></div>
-                <div><p className="text-[10px] text-muted">GITHUB STARS</p><p className="font-mono text-[18px] text-ink">{profile.githubStars ?? "—"}</p></div>
-              </div>
-              <ContributionGraph weeks={profile.githubContributions} />
-            </div>
+          <div className="space-y-4 mb-8">
+            <GitHubActivity profile={profile} />
+            <div className="grid sm:grid-cols-2 gap-4">
 
             {/* Codeforces / competitive */}
             <div className="border border-border rounded-xl p-4">
@@ -263,6 +201,7 @@ export default function PublicProfilePage() {
               </div>
             </div>
           </div>
+        </div>
         </div>
 
         {/* Connect modal */}

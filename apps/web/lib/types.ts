@@ -60,3 +60,18 @@ export interface SessionUser extends AuthUser {
   accessToken: string;
   onboardingComplete: boolean;
 }
+
+/** A chat room returned by GET /chat/rooms. */
+export interface ChatRoom {
+  id: string;
+  matchId: string;
+  otherUserId: string;
+  intentType: IntentType | null;
+  unreadCount: number;
+  updatedAt: string;
+  lastMessage: {
+    content: string;
+    senderId: string;
+    createdAt: string;
+  } | null;
+}

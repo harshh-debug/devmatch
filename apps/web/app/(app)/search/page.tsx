@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/apiClient";
 import { useToken } from "@/hooks/useToken";
@@ -18,7 +18,12 @@ type SearchResult = {
 export default function SearchPage() {
   const token = useToken();
   const [query, setQuery] = useState("");
-  const search = query.trim();
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setSearch(query.trim()), 300);
+    return () => clearTimeout(timeout);
+  }, [query]);
   const { data: users = [], isFetching } = useQuery({
     queryKey: ["users", "search", search],
     queryFn: () => apiFetch<SearchResult[]>("/users/search", { token, query: { q: search } }),

@@ -8,6 +8,7 @@
     ],
     "strictNullChecks": true,
     "declaration": false,
+    "declarationMap": false,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
