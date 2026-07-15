@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { profileService } from "../services/profile.service";
 import { intentService } from "../services/intent.service";
-import { buildSkillVector } from "@devmatch/shared";
+import { buildSkillVector, normalizeSkillTags } from "@devmatch/shared";
 import {
 	updateMeSchema,
 	updateSkillsSchema,
@@ -129,9 +129,15 @@ export const profileHandler = {
 			}
 
 			// 1. Save the raw tags and handles
+			const profileUpdate = {
+				...parsed.data,
+				...(parsed.data.skillTags
+					? { skillTags: normalizeSkillTags(parsed.data.skillTags) }
+					: {}),
+			};
 			const updatedProfile = await profileService.upsertProfile(
 				userId,
-				parsed.data,
+				profileUpdate,
 			);
 
 			// 2. Compute the mathematical skill vector

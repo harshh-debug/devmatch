@@ -189,6 +189,7 @@
     "packages/db": {
       "name": "db",
       "dependencies": {
+        "@devmatch/shared": "*",
         "@prisma/adapter-pg": "^7.5.0",
         "@prisma/client": "^7.5.0",
         "@types/bcrypt": "^6.0.0",
