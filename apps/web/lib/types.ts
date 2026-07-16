@@ -5,6 +5,24 @@
 export type Availability = "ACTIVE" | "OPEN" | "BUSY";
 
 export type IntentType = "DSA" | "HACKATHON" | "PROJECT" | "OPENSOURCE";
+export type Compatibility = "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN";
+export type LevelSource = "CODEFORCES" | "LEETCODE" | "MIXED_CP" | "GITHUB" | "UNKNOWN";
+export type MatchTier = "STRICT" | "RELAXED_PREFERENCES";
+
+export interface IntentPreferences {
+  intentType: IntentType;
+  ratingMin?: number;
+  ratingMax?: number;
+  preferredLanguages: string[];
+  preferredDomains: string[];
+}
+
+export interface IntentState {
+  searchIntent: IntentPreferences | null;
+  openToIntents: IntentType[];
+  effectiveOpenToIntents: IntentType[];
+  revision: number;
+}
 
 export type MessageType = "TEXT" | "CODE_SNIPPET" | "LINK";
 

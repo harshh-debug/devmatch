@@ -6,6 +6,13 @@ DevMatch helps developers find collaborators at a comparable experience level. R
 
 Matching is deterministic and explainable. Do not introduce ML models or opaque learned ranking unless the product direction explicitly changes.
 
+The product exposes two independent recommendation signals:
+
+- `compatibility` is experience-level proximity: HIGH/NEAR, MEDIUM/MID, LOW/FAR, or UNKNOWN.
+- `similarity` is intent-specific technical overlap expressed as a percentage.
+
+Rank compatibility bands first and similarity within each band. Never combine them into a weighted score.
+
 ## Directional intent model
 
 Never conflate what a user is currently searching for with the intents for which that user is willing to appear in someone else's search.
@@ -46,6 +53,26 @@ The candidate's own `searchIntent` does not need to equal the requester's intent
 - Ratings and experience levels are distance/eligibility signals, not generic cosine dimensions.
 - Missing data must lower confidence or use a documented fallback; it must never be interpreted as elite or zero-level ability.
 - Relaxation may widen optional ranges in bounded tiers, but must never bypass the absolute technical-overlap floor.
+- Stable order is HIGH compatibility, then MEDIUM, LOW, and UNKNOWN; within each band sort by similarity descending.
+- UNKNOWN means insufficient comparable level data, not low skill.
+- Project and Hackathon may use manual-skill fallback with UNKNOWN level compatibility. Open Source requires usable GitHub data.
+
+## Event propagation
+
+PostgreSQL is the source of truth. Intent mutations must commit the intent rows and a transactional outbox record atomically.
+
+```text
+PostgreSQL commit
+  → outbox dispatcher
+  → Kafka domain event
+  → Match Service reloads the complete record from PostgreSQL
+  → Redis cache replacement/eviction
+  → frontend query invalidation
+```
+
+Events carry identifiers and version metadata, not partial cache state. Consumers must be idempotent because outbox delivery is at least once. Match Service startup warm-up and periodic reconciliation must make Redis converge to PostgreSQL after missed, duplicated, or out-of-order events.
+
+Intent state carries a monotonically increasing revision. When a frontend request has a newer revision than Redis, Match Service must reload the requester from PostgreSQL before ranking.
 
 ## Intent-specific compatibility
 
@@ -61,17 +88,20 @@ The candidate's own `searchIntent` does not need to equal the requester's intent
 - Require meaningful overlap in languages, frameworks, or domains.
 - Use GitHub-derived languages, repository topics, activity, and experience level when available.
 - Competitive-programming ratings must not influence project compatibility.
+- Without usable GitHub data, allow canonical manual-skill matching but mark level compatibility UNKNOWN.
 
 ### Hackathon
 
 - Match languages, frameworks, domains, and GitHub-derived development level.
 - Prefer candidates who can realistically collaborate at a similar pace and experience level.
 - Competitive-programming signals may only be considered when the declared hackathon domain is explicitly algorithmic.
+- Without usable GitHub data, allow canonical manual-skill matching but mark level compatibility UNKNOWN.
 
 ### Open source
 
 - Require a connected GitHub profile with usable synced technical data.
 - Match repository languages, topics/domains, activity recency, and GitHub experience level.
+- Keep GitHub languages/topics and GitHub sync time source-specific; Open Source eligibility and similarity must not be satisfied by manual skills or another provider's sync timestamp.
 - Do not treat stars alone as experience; use bounded/log-scaled signals so one popular repository cannot dominate.
 
 ## Same-level principle
@@ -79,9 +109,10 @@ The candidate's own `searchIntent` does not need to equal the requester's intent
 Technical overlap answers “can these people work on the same thing?” Level proximity answers “are they likely to be productive peers?” Both conditions matter.
 
 - DSA level comes primarily from Codeforces rating and LeetCode global rank proximity.
-- Project, hackathon, and open-source level comes from bounded GitHub signals such as contribution activity, repository languages/topics, stars, and profile completeness.
+- Project, hackathon, and open-source level comes from bounded GitHub signals such as contribution activity, active contribution weeks, and stars.
 - Level bands must be broad enough for sparse pools but bounded enough to avoid recommending beginners and highly advanced developers as strong peers without evidence.
 - Similarity percentages shown to users must correspond to the same intent-specific calculation used to rank the result.
+- Compatibility controls the primary ranking band; similarity only orders candidates within the same compatibility band.
 
 ## Testing expectations
 

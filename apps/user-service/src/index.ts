@@ -2,6 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import { userRouter } from './routes/user.routes';
+import { startOutboxDispatcher } from './services/outbox.dispatcher';
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -24,4 +25,5 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 
 app.listen(PORT, () => {
   console.log(`User service running on port ${PORT}`);
+  startOutboxDispatcher();
 });

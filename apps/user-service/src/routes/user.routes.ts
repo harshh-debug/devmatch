@@ -18,9 +18,10 @@ userRouter.get('/users/search', extractUser, profileHandler.searchUsers);
 userRouter.get('/users/username-availability', extractUser, profileHandler.checkUsername);
 
 // Intent Management
-userRouter.get('/users/me/intent', extractUser, intentHandler.getIntent);
-userRouter.post('/users/me/intent', extractUser, intentHandler.setIntent);
-userRouter.delete('/users/me/intent', extractUser, intentHandler.deleteIntent);
+userRouter.get('/users/me/intents', extractUser, intentHandler.getIntents);
+userRouter.put('/users/me/search-intent', extractUser, intentHandler.setSearchIntent);
+userRouter.delete('/users/me/search-intent', extractUser, intentHandler.deleteSearchIntent);
+userRouter.put('/users/me/open-to', extractUser, intentHandler.replaceOpenTo);
 
 // Third-Party Platform Connection & Sync Triggers
 userRouter.post('/users/me/connect/github', extractUser, connectHandler.connectGitHub);

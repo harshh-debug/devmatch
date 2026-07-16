@@ -4,7 +4,9 @@ async function main() {
 	console.log("🧹 Clearing old test data...");
 	await prismaClient.matchAction.deleteMany();
 	await prismaClient.match.deleteMany();
-	await prismaClient.matchIntent.deleteMany();
+	await prismaClient.outboxEvent.deleteMany();
+	await prismaClient.openToIntent.deleteMany();
+	await prismaClient.searchIntent.deleteMany();
 	await prismaClient.profile.deleteMany();
 	await prismaClient.user.deleteMany();
 
@@ -39,12 +41,8 @@ async function main() {
 					cfRating: 1500,
 				},
 			},
-			intents: {
-				create: [
-					{ intentType: IntentType.DSA },
-					{ intentType: IntentType.PROJECT },
-				],
-			},
+			searchIntent: { create: { intentType: IntentType.DSA } },
+			openToIntents: { create: [{ intentType: IntentType.PROJECT }] },
 		},
 	});
 
@@ -62,7 +60,7 @@ async function main() {
 					cfRating: 1550,
 				},
 			},
-			intents: { create: [{ intentType: IntentType.DSA }] },
+			openToIntents: { create: [{ intentType: IntentType.DSA }] },
 		},
 	});
 
@@ -80,7 +78,7 @@ async function main() {
 					cfRating: 2200,
 				},
 			},
-			intents: { create: [{ intentType: IntentType.DSA }] },
+			openToIntents: { create: [{ intentType: IntentType.DSA }] },
 		},
 	});
 
@@ -98,7 +96,7 @@ async function main() {
 					cfRating: 1400,
 				},
 			},
-			intents: { create: [{ intentType: IntentType.DSA }] },
+			openToIntents: { create: [{ intentType: IntentType.DSA }] },
 		},
 	});
 
@@ -116,7 +114,7 @@ async function main() {
 					cfRating: 1450,
 				},
 			},
-			intents: { create: [{ intentType: IntentType.DSA }] },
+			openToIntents: { create: [{ intentType: IntentType.DSA }] },
 		},
 	});
 
@@ -134,7 +132,7 @@ async function main() {
 					cfRating: 1500,
 				},
 			},
-			intents: { create: [{ intentType: IntentType.HACKATHON }] }, // WRONG INTENT
+			openToIntents: { create: [{ intentType: IntentType.HACKATHON }] }, // WRONG INTENT
 		},
 	});
     // 7. The Tech Mismatch (Correct intent, correct rating, but terrible vector similarity)
@@ -144,7 +142,7 @@ async function main() {
             email: "mismatch@test.com", username: "python_dev", displayName: "Mismatch User",
             availability: Availability.ACTIVE,
             profile: { create: { skillVector: mismatchedVector, profileScore: 85, cfRating: 1500 } },
-            intents: { create: [{ intentType: IntentType.DSA }] }
+            openToIntents: { create: [{ intentType: IntentType.DSA }] }
         }
     });
 

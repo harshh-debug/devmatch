@@ -1,232 +1,284 @@
-import prismaClient, { ActionType, IntentType } from "db/client";
-import { markAsSeen } from "./cache/vectorCache";
-import { calculateCosineSimilarity } from "./engine/cosine";
+import prismaClient, { ActionType, IntentType, type MatchAction } from "db/client";
+import { markAsSeen, reconstructMatchProfile } from "./cache/vectorCache";
+import { evaluateRecommendation } from "./engine/ranker";
+import type { RecommendationSnapshot } from "./engine/types";
 import { publishMatchAccepted, publishMatchRejected } from "./kafka/producer";
 
+export class MatchActionError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 export interface MatchActionResult {
-	action: ActionType;
-	isMutual: boolean;
-	matchId: string | null;
+  action: ActionType;
+  isMutual: boolean;
+  matchId: string | null;
 }
 
-/**
- * Handles a user accepting or rejecting a candidate.
- */
+function snapshotData(snapshot: RecommendationSnapshot | null) {
+  return snapshot
+    ? {
+        similarityScore: snapshot.similarityScore,
+        compatibility: snapshot.compatibility,
+        levelSource: snapshot.levelSource,
+        matchTier: snapshot.matchTier,
+        matchedSkills: snapshot.matchedSkills,
+        matchedLanguages: snapshot.matchedLanguages,
+        matchedDomains: snapshot.matchedDomains,
+        explanation: snapshot.explanation,
+      }
+    : {
+        similarityScore: null,
+        compatibility: null,
+        levelSource: null,
+        matchTier: null,
+        matchedSkills: [],
+        matchedLanguages: [],
+        matchedDomains: [],
+        explanation: undefined,
+      };
+}
+
+function snapshotFromAction(action: MatchAction): RecommendationSnapshot | null {
+  if (
+    action.similarityScore === null ||
+    action.compatibility === null ||
+    action.levelSource === null ||
+    action.matchTier === null
+  ) {
+    return null;
+  }
+  return {
+    similarityScore: action.similarityScore,
+    compatibility: action.compatibility,
+    levelSource: action.levelSource,
+    matchTier: action.matchTier,
+    matchedSkills: action.matchedSkills,
+    matchedLanguages: action.matchedLanguages,
+    matchedDomains: action.matchedDomains,
+    explanation: {
+      intentType: action.intentType,
+      compatibility: action.compatibility,
+      levelSource: action.levelSource,
+      matchTier: action.matchTier,
+    },
+  };
+}
+
+async function computeActionSnapshot(
+  actorId: string,
+  targetId: string,
+  intentType: IntentType,
+  incomingAction: MatchAction | null,
+) {
+  if (incomingAction?.action === "ACCEPTED") {
+    return snapshotFromAction(incomingAction);
+  }
+
+  const [actor, target] = await Promise.all([
+    reconstructMatchProfile(actorId),
+    reconstructMatchProfile(targetId),
+  ]);
+  if (!actor?.searchIntent || actor.searchIntent.intentType !== intentType) {
+    throw new MatchActionError(
+      409,
+      "SEARCH_INTENT_CHANGED",
+      "Your current search intent no longer matches this candidate.",
+    );
+  }
+  if (!target) {
+    throw new MatchActionError(
+      409,
+      "CANDIDATE_NO_LONGER_ELIGIBLE",
+      "This candidate is no longer eligible.",
+    );
+  }
+  const evaluated = evaluateRecommendation(actor, target, intentType);
+  if (!evaluated) {
+    throw new MatchActionError(
+      409,
+      "CANDIDATE_NO_LONGER_ELIGIBLE",
+      "This candidate is no longer eligible.",
+    );
+  }
+  return evaluated.snapshot;
+}
+
 export async function processMatchAction(
-	actorId: string,
-	targetId: string,
-	action: ActionType,
-	intentType: IntentType,
+  actorId: string,
+  targetId: string,
+  action: ActionType,
+  intentType: IntentType,
 ): Promise<MatchActionResult> {
-	// 1. Instantly update Redis so the UI feels snappy on the next refresh
-	// We don't await this blockingly because Redis is fast and fire-and-forget here is fine.
-	markAsSeen(actorId, targetId, intentType).catch((err) =>
-		console.error(
-			`[Redis] Failed to mark ${targetId} as seen by ${actorId}:`,
-			err,
-		),
-	);
+  const incomingAction = await prismaClient.matchAction.findUnique({
+    where: {
+      actorId_targetId_intentType: {
+        actorId: targetId,
+        targetId: actorId,
+        intentType,
+      },
+    },
+  });
+  const snapshot = await computeActionSnapshot(actorId, targetId, intentType, incomingAction);
 
-	// 2. Record the action in PostgreSQL idempotently
-	try {
-		await prismaClient.matchAction.create({
-			data: { actorId, targetId, action, intentType },
-		});
-	} catch (error: any) {
-		// P2002 means they already swiped on this person for this intent.
-		// We just proceed as normal (Idempotent).
-		if (error.code !== "P2002") throw error;
-	}
+  const completingAction = await prismaClient.matchAction.upsert({
+    where: {
+      actorId_targetId_intentType: { actorId, targetId, intentType },
+    },
+    create: {
+      actorId,
+      targetId,
+      action,
+      intentType,
+      ...snapshotData(snapshot),
+    },
+    update: {
+      action,
+      ...snapshotData(snapshot),
+    },
+  });
 
-	// 3. If REJECTED, we are done.
-	if (action === "REJECTED") {
-        publishMatchRejected(actorId, targetId, intentType);
-		return { action, isMutual: false, matchId: null };
-	}
+  void markAsSeen(actorId, targetId, intentType).catch((error) =>
+    console.error(`[Redis] Failed to mark ${targetId} as seen by ${actorId}`, error),
+  );
 
-	// 4. If ACCEPTED, check if the target has already ACCEPTED the actor for this intent
-	const targetAction = await prismaClient.matchAction.findUnique({
-		where: {
-			actorId_targetId_intentType: {
-				actorId: targetId,
-				targetId: actorId,
-				intentType,
-			},
-		},
-	});
+  if (action === "REJECTED") {
+    void publishMatchRejected(actorId, targetId, intentType);
+    return { action, isMutual: false, matchId: null };
+  }
 
-	if (targetAction?.action === "ACCEPTED") {
-		return await createMutualMatch(actorId, targetId, intentType);
-	}
-
-	// Still waiting on the other person
-	return { action, isMutual: false, matchId: null };
+  if (incomingAction?.action === "ACCEPTED") {
+    return createMutualMatch(actorId, targetId, intentType, completingAction);
+  }
+  return { action, isMutual: false, matchId: null };
 }
 
-/**
- * Creates the mutual match record. Contains race-condition guards.
- */
 async function createMutualMatch(
-	actorId: string,
-	targetId: string,
-	intentType: IntentType,
+  actorId: string,
+  targetId: string,
+  intentType: IntentType,
+  completingAction: MatchAction,
 ): Promise<MatchActionResult> {
-	// Lexicographical sorting guarantees UserA is always the "lesser" string.
-	// This makes the @@unique([userAId, userBId]) constraint work perfectly.
-	const [userAId, userBId] =
-		actorId < targetId ? [actorId, targetId] : [targetId, actorId];
-
-	try {
-		// Fetch authoritative vectors to record the score
-		const profiles = await prismaClient.profile.findMany({
-			where: { userId: { in: [actorId, targetId] } },
-			select: { userId: true, skillVector: true },
-		});
-		const actorProfile = profiles.find((p) => p.userId === actorId);
-		const targetProfile = profiles.find((p) => p.userId === targetId);
-
-		let similarityScore = 0;
-		if (actorProfile && targetProfile) {
-			similarityScore = calculateCosineSimilarity(
-				actorProfile.skillVector,
-				targetProfile.skillVector,
-			);
-		}
-		// Create the official Match
-		const match = await prismaClient.match.create({
-			data: {
-				userAId,
-				userBId,
-				similarityScore,
-				intentType,
-				status: "MATCHED",
-				matchedAt: new Date(),
-				initiatedBy: actorId, // Tracking who "completed" the handshake
-			},
-		});
-        
-        publishMatchAccepted(
-            match.id, 
-            match.userAId, 
-            match.userBId, 
-            match.intentType, 
-            match.similarityScore
-        );
-
-		return { action: "ACCEPTED", isMutual: true, matchId: match.id };
-	} catch (error: any) {
-		// RACE CONDITION GUARD:
-		// If two concurrent requests try to create the match, the second one will hit a P2002.
-		// That is totally fine. It means the match was successfully created 1 millisecond ago.
-		if (error.code === "P2002") {
-			const existingMatch = await prismaClient.match.findUnique({
-				where: { userAId_userBId_intentType: { userAId, userBId,intentType } },
-			});
-			return {
-				action: "ACCEPTED",
-				isMutual: true,
-				matchId: existingMatch?.id || null,
-			};
-		}
-		throw error;
-	}
+  const [userAId, userBId] = actorId < targetId
+    ? [actorId, targetId]
+    : [targetId, actorId];
+  try {
+    const match = await prismaClient.match.create({
+      data: {
+        userAId,
+        userBId,
+        intentType,
+        status: "MATCHED",
+        matchedAt: new Date(),
+        initiatedBy: actorId,
+        similarityScore: completingAction.similarityScore,
+        compatibility: completingAction.compatibility,
+        levelSource: completingAction.levelSource,
+        matchTier: completingAction.matchTier,
+        matchedSkills: completingAction.matchedSkills,
+        matchedLanguages: completingAction.matchedLanguages,
+        matchedDomains: completingAction.matchedDomains,
+        explanation: completingAction.explanation ?? undefined,
+      },
+    });
+    void publishMatchAccepted(
+      match.id,
+      match.userAId,
+      match.userBId,
+      match.intentType,
+      match.similarityScore ?? 0,
+    );
+    return { action: "ACCEPTED", isMutual: true, matchId: match.id };
+  } catch (error: any) {
+    if (error.code === "P2002") {
+      const existingMatch = await prismaClient.match.findUnique({
+        where: { userAId_userBId_intentType: { userAId, userBId, intentType } },
+      });
+      return {
+        action: "ACCEPTED",
+        isMutual: true,
+        matchId: existingMatch?.id ?? null,
+      };
+    }
+    throw error;
+  }
 }
 
-/**
- * Fetches all active mutual matches for a user (used for the frontend matches list)
- */
 export async function getMutualMatches(userId: string) {
-	const matches = await prismaClient.match.findMany({
-		where: {
-			OR: [{ userAId: userId }, { userBId: userId }],
-			status: "MATCHED",
-		},
-		include: {
-			// We need to fetch the OTHER user's profile details to show in the UI
-			userA: {
-				select: {
-					id: true,
-					displayName: true,
-					avatarUrl: true,
-					username: true,
-				},
-			},
-			userB: {
-				select: {
-					id: true,
-					displayName: true,
-					avatarUrl: true,
-					username: true,
-				},
-			},
-		},
-		orderBy: { matchedAt: "desc" },
-	});
-
-	// Format the response so the frontend doesn't have to figure out who is User A vs B
-	return matches.map((m) => {
-		const otherUser = m.userAId === userId ? m.userB : m.userA;
-		return {
-			matchId: m.id,
-			similarityScore: m.similarityScore,
-			intentType: m.intentType,
-			matchedAt: m.matchedAt,
-			matchedUser: otherUser,
-		};
-	});
+  const matches = await prismaClient.match.findMany({
+    where: {
+      OR: [{ userAId: userId }, { userBId: userId }],
+      status: "MATCHED",
+    },
+    include: {
+      userA: { select: { id: true, displayName: true, avatarUrl: true, username: true } },
+      userB: { select: { id: true, displayName: true, avatarUrl: true, username: true } },
+    },
+    orderBy: { matchedAt: "desc" },
+  });
+  return matches.map((match) => ({
+    matchId: match.id,
+    similarityScore: match.similarityScore,
+    compatibility: match.compatibility,
+    levelSource: match.levelSource,
+    matchedSkills: match.matchedSkills,
+    matchedLanguages: match.matchedLanguages,
+    matchedDomains: match.matchedDomains,
+    matchTier: match.matchTier,
+    intentType: match.intentType,
+    matchedAt: match.matchedAt,
+    matchedUser: match.userAId === userId ? match.userB : match.userA,
+  }));
 }
-
-
 
 export async function getPendingRequests(userId: string) {
-    const incomingAccepts = await prismaClient.matchAction.findMany({
-        where: {
-            targetId: userId,
-            action: "ACCEPTED",
-        },
-        orderBy: { createdAt: 'desc' } 
-    });
+  const incomingAccepts = await prismaClient.matchAction.findMany({
+    where: { targetId: userId, action: "ACCEPTED" },
+    orderBy: { createdAt: "desc" },
+  });
+  if (incomingAccepts.length === 0) return [];
 
-    if (incomingAccepts.length === 0) return [];
+  const requesterIds = incomingAccepts.map((action) => action.actorId);
+  const myResponses = await prismaClient.matchAction.findMany({
+    where: { actorId: userId, targetId: { in: requesterIds } },
+  });
+  const respondedSet = new Set(
+    myResponses.map((response) => `${response.targetId}_${response.intentType}`),
+  );
+  const pendingActions = incomingAccepts.filter(
+    (action) => !respondedSet.has(`${action.actorId}_${action.intentType}`),
+  );
+  if (pendingActions.length === 0) return [];
 
-    const requesterIds = incomingAccepts.map(a => a.actorId);
-    const myResponses = await prismaClient.matchAction.findMany({
-        where: {
-            actorId: userId,
-            targetId: { in: requesterIds },
-        },
-    });
-
-    // Example: "user456_HACKATHON"
-    const respondedSet = new Set(
-        myResponses.map(r => `${r.targetId}_${r.intentType}`)
-    );
-
-    const pendingActions = incomingAccepts.filter(
-        a => !respondedSet.has(`${a.actorId}_${a.intentType}`)
-    );
-
-    if (pendingActions.length === 0) return [];
-
-    const uniquePendingIds = [...new Set(pendingActions.map(a => a.actorId))];
-    const profiles = await prismaClient.user.findMany({
-        where: { id: { in: uniquePendingIds } },
-        include: { profile: true },
-    });
-
-    return pendingActions.map(action => {
-        const user = profiles.find(p => p.id === action.actorId)!;
-        return {
-            userId: user.id,
-            username: user.username,
-            displayName: user.displayName,
-            avatarUrl: user.avatarUrl,
-            college: user.college,
-            profileScore: user.profile?.profileScore || 0,
-            cfRating: user.profile?.cfRating || null,
-            skillTags: user.profile?.skillTags || [],
-            requestedIntent: action.intentType, 
-            requestedAt: action.createdAt,
-        };
-    });
+  const users = await prismaClient.user.findMany({
+    where: { id: { in: [...new Set(pendingActions.map((action) => action.actorId))] } },
+    include: { profile: true },
+  });
+  return pendingActions.map((action) => {
+    const user = users.find((candidate) => candidate.id === action.actorId)!;
+    return {
+      userId: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+      college: user.college,
+      profileScore: user.profile?.profileScore ?? 0,
+      cfRating: user.profile?.cfRating ?? null,
+      skillTags: user.profile?.skillTags ?? [],
+      requestedIntent: action.intentType,
+      requestedAt: action.createdAt,
+      similarityScore: action.similarityScore,
+      compatibility: action.compatibility,
+      levelSource: action.levelSource,
+      matchedSkills: action.matchedSkills,
+      matchedLanguages: action.matchedLanguages,
+      matchedDomains: action.matchedDomains,
+      matchTier: action.matchTier,
+    };
+  });
 }

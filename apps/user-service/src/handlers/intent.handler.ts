@@ -1,74 +1,56 @@
 import type { Request, Response, NextFunction } from "express";
 import { intentService } from "../services/intent.service";
-import { setIntentSchema } from "../validators/user.validators";
+import {
+  openToIntentsSchema,
+  searchIntentSchema,
+} from "../validators/user.validators";
+
+function unauthorized(res: Response) {
+  return res.status(401).json({ message: "Unauthorized" });
+}
 
 export const intentHandler = {
-	async getIntent(
-		req: Request,
-		res: Response,
-		next: NextFunction,
-	) {
-		try {
-			if (!req.user?.id) {
-				return res.status(401).json("Unauthorized");
-			}
+  async getIntents(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user?.id) return unauthorized(res);
+      res.json(await intentService.getIntentState(req.user.id));
+    } catch (error) {
+      next(error);
+    }
+  },
 
-			const userId = req.user.id;
-			const intent = await intentService.getActiveIntent(userId);
+  async setSearchIntent(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user?.id) return unauthorized(res);
+      const parsed = searchIntentSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ errors: parsed.error.format() });
+      }
+      res.json(await intentService.setSearchIntent(req.user.id, parsed.data));
+    } catch (error) {
+      next(error);
+    }
+  },
 
-			res.json({ intent: intent || null });
-		} catch (error) {
-			next(error);
-		}
-	},
+  async deleteSearchIntent(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user?.id) return unauthorized(res);
+      res.json(await intentService.deleteSearchIntent(req.user.id));
+    } catch (error) {
+      next(error);
+    }
+  },
 
-	async setIntent(
-		req: Request,
-		res: Response,
-		next: NextFunction,
-	) {
-		try {
-			if (!req.user?.id) {
-				return res.status(401).json("Unauthorized");
-			}
-
-			const userId = req.user.id;
-			const parsed = setIntentSchema.safeParse(req.body);
-
-			if (!parsed.success) {
-				return res.status(400).json({
-					errors: parsed.error.format(),
-				});
-			}
-
-			const newIntent = await intentService.setIntent(
-				userId,
-				parsed.data,
-			);
-
-			res.json(newIntent);
-		} catch (error) {
-			next(error);
-		}
-	},
-
-	async deleteIntent(
-		req: Request,
-		res: Response,
-		next: NextFunction,
-	) {
-		try {
-			if (!req.user?.id) {
-				return res.status(401).json("Unauthorized");
-			}
-
-			const userId = req.user.id;
-
-			await intentService.deleteIntent(userId);
-
-			res.json({ success: true });
-		} catch (error) {
-			next(error);
-		}
-	},
+  async replaceOpenTo(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user?.id) return unauthorized(res);
+      const parsed = openToIntentsSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ errors: parsed.error.format() });
+      }
+      res.json(await intentService.replaceOpenToIntents(req.user.id, parsed.data.intentTypes));
+    } catch (error) {
+      next(error);
+    }
+  },
 };

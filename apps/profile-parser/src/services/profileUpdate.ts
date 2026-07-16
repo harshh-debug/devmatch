@@ -15,6 +15,7 @@ export const profileUpdater = {
             ...fetchedData.topLanguages, 
             ...fetchedData.inferredTopics
         ]);
+        const githubTopics = skillTagMapper.normalizeTags(fetchedData.inferredTopics);
         
         const mergedTags = Array.from(new Set([
             ...existingProfile.skillTags, 
@@ -35,6 +36,8 @@ export const profileUpdater = {
                 contributionStreak: fetchedData.contributionStreak,
                 githubContributions: fetchedData.githubContributions,
                 topLanguages: fetchedData.topLanguages,
+                githubTopics,
+                githubLastSyncedAt: new Date(),
                 skillTags: mergedTags,
                 skillVector: newVector, 
                 lastSyncedAt: new Date(),

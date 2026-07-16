@@ -15,12 +15,29 @@ export const updateSkillsSchema = z.object({
   githubUsername: z.string().optional(),
 });
 
-export const setIntentSchema = z.object({
+export const searchIntentSchema = z.object({
   intentType: z.enum(['DSA', 'HACKATHON', 'PROJECT', 'OPENSOURCE']),
   ratingMin: z.number().min(0).optional(),
   ratingMax: z.number().max(4000).optional(),
-  preferredLanguages: z.array(z.string()).optional(),
-  preferredDomains: z.array(z.string()).optional(),
+  preferredLanguages: z.array(z.string()).max(20).default([]),
+  preferredDomains: z.array(z.string()).max(20).default([]),
+}).superRefine((value, ctx) => {
+  if (
+    value.intentType === "DSA" &&
+    value.ratingMin !== undefined &&
+    value.ratingMax !== undefined &&
+    value.ratingMin > value.ratingMax
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["ratingMax"],
+      message: "ratingMax must be greater than or equal to ratingMin",
+    });
+  }
+});
+
+export const openToIntentsSchema = z.object({
+  intentTypes: z.array(z.enum(['DSA', 'HACKATHON', 'PROJECT', 'OPENSOURCE'])).max(4),
 });
 
 export const connectPlatformSchema = z.object({

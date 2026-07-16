@@ -37,6 +37,32 @@ enum ActionType {
   REJECTED
 }
 
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PUBLISHED
+}
+
+enum MatchCompatibility {
+  HIGH
+  MEDIUM
+  LOW
+  UNKNOWN
+}
+
+enum MatchLevelSource {
+  CODEFORCES
+  LEETCODE
+  MIXED_CP
+  GITHUB
+  UNKNOWN
+}
+
+enum MatchTier {
+  STRICT
+  RELAXED_PREFERENCES
+}
+
 enum MessageType {
   TEXT
   CODE_SNIPPET
@@ -54,10 +80,12 @@ model User{
   college      String?
   bio          String?
   availability Availability  @default(ACTIVE)
+  matchPreferencesRevision Int @default(0)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   profile      Profile?
-  intents      MatchIntent[]
+  searchIntent SearchIntent?
+  openToIntents OpenToIntent[]
   matchesAsA   Match[]       @relation("MatchUserA")
   matchesAsB   Match[]       @relation("MatchUserB")
 }
@@ -77,6 +105,8 @@ model Profile {
     githubStars        Int       @default(0)
     contributionStreak Int       @default(0)
     githubContributions Json?
+    githubTopics       String[]
+    githubLastSyncedAt DateTime?
     lcRating           Int?
     cfRating           Int?
     skillVector        Float[]
@@ -85,20 +115,47 @@ model Profile {
     createdAt          DateTime  @default(now())
     updatedAt          DateTime @default(now()) @updatedAt
   }
- 
-model MatchIntent {
-    id                 String     @id @default(uuid())
-    userId             String
-    user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-    intentType         IntentType
-    ratingMin          Int?
-    ratingMax          Int?
-    preferredLanguages String[]
-    preferredDomains   String[]
-    active             Boolean    @default(true)
-    createdAt          DateTime   @default(now())
-    updatedAt          DateTime   @updatedAt
-  }
+model SearchIntent {
+  userId             String     @id
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intentType         IntentType
+  ratingMin          Int?
+  ratingMax          Int?
+  preferredLanguages String[]
+  preferredDomains   String[]
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+}
+
+model OpenToIntent {
+  id         String     @id @default(uuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intentType IntentType
+  createdAt  DateTime   @default(now())
+
+  @@unique([userId, intentType])
+  @@index([intentType])
+}
+
+model OutboxEvent {
+  id            String       @id @default(uuid())
+  topic         String
+  aggregateId   String
+  eventType     String
+  schemaVersion Int
+  payload       Json
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  nextAttemptAt DateTime     @default(now())
+  createdAt     DateTime     @default(now())
+  publishedAt   DateTime?
+  lockedAt      DateTime?
+  lockedBy      String?
+
+  @@index([status, nextAttemptAt])
+  @@index([aggregateId])
+}
  
 // ── MATCH SERVICE DOMAIN ─────────────────────────────────────
 model Match {
@@ -107,7 +164,14 @@ model Match {
   userBId        String
   userA          User        @relation("MatchUserA", fields: [userAId], references: [id])
   userB          User        @relation("MatchUserB", fields: [userBId], references: [id])
-  similarityScore Float
+  similarityScore Float?
+  compatibility MatchCompatibility?
+  levelSource MatchLevelSource?
+  matchTier MatchTier?
+  matchedSkills String[]
+  matchedLanguages String[]
+  matchedDomains String[]
+  explanation Json?
   intentType     IntentType
   status         MatchStatus @default(PENDING)
   matchedAt      DateTime?
@@ -123,6 +187,14 @@ model MatchAction {
   targetId    String
   action      ActionType
   intentType  IntentType
+  similarityScore Float?
+  compatibility MatchCompatibility?
+  levelSource MatchLevelSource?
+  matchTier MatchTier?
+  matchedSkills String[]
+  matchedLanguages String[]
+  matchedDomains String[]
+  explanation Json?
   createdAt   DateTime     @default(now())
   @@unique([actorId, targetId, intentType])
 }

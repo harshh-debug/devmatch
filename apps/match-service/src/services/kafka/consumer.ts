@@ -1,85 +1,47 @@
 import { subscribe, TOPICS } from "@devmatch/kafka";
-import prismaClient from "db/client";
-import { setSingleMatchProfile } from "../cache/vectorCache";
+import type { MatchPreferencesUpdatedV1 } from "@devmatch/shared";
+import { reconstructMatchProfile } from "../cache/vectorCache";
 import { redisClient } from "../cache/redis";
-import type { MatchProfile, IntentType } from "../engine/types";
 
-const PROFILES_HASH = "match_profiles";
+const PROCESSED_EVENT_KEY = (eventId: string) => `match-event:${eventId}`;
+const EVENT_TTL_SECONDS = 7 * 24 * 60 * 60;
 
-/**
- * Reconstructs a user's MatchProfile from the database and updates Redis.
- * This guarantees the cache has 100% accurate, non-fragmented data.
- */
 async function syncUserCache(userId: string) {
-	console.log(
-		`\n🔔 [Kafka Consumer] DOORBELL RANG! Received event for user: ${userId}`,
-	);
-	try {
-		const p = await prismaClient.profile.findUnique({
-			where: { userId },
-			include: {
-				user: {
-					include: { intents: { where: { active: true } } },
-				},
-			},
-		});
-
-		// 1. Eviction: User deleted profile, turned off all intents, or has incomplete data
-		if (
-			!p ||
-			p.user.intents.length === 0 ||
-			p.profileScore < 30 ||
-			p.skillVector.every((v) => v === 0)
-		) {
-			await redisClient.hdel(PROFILES_HASH, userId);
-			console.log(`[Cache] Evicted user ${userId} (Incomplete or inactive)`);
-			return;
-		}
-
-		// 2. Update: User is fully active and valid
-		const activeIntents = p.user.intents.map((i) => i.intentType as IntentType);
-
-		const matchProfile: MatchProfile = {
-			userId: p.userId,
-			username: p.user.username,
-			displayName: p.user.displayName,
-			avatarUrl: p.user.avatarUrl,
-			college: p.user.college,
-			skillTags: p.skillTags,
-			lcRating: p.lcRating,
-			skillVector: p.skillVector,
-			activeIntents: activeIntents,
-			availability: p.user.availability,
-			cfRating: p.cfRating,
-			profileScore: p.profileScore,
-		};
-
-		await setSingleMatchProfile(matchProfile);
-		console.log(`[Cache] Synchronized profile for user ${userId}`);
-	} catch (error) {
-		console.error(
-			`[Kafka Consumer] Failed to sync cache for user ${userId}:`,
-			error,
-		);
-	}
+  const profile = await reconstructMatchProfile(userId);
+  console.log(profile
+    ? `[Cache] Synchronized profile for ${userId}`
+    : `[Cache] Evicted ineligible profile for ${userId}`);
 }
 
-/**
- * Initializes the consumers on service boot.
- */
 export async function startKafkaConsumers() {
-	console.log("[Kafka] Starting consumers...");
+  console.log("[Kafka] Starting match-service consumers...");
+  await subscribe<Record<string, unknown>>(
+    [TOPICS.PROFILE_UPDATED, TOPICS.USER_UPDATED, TOPICS.MATCH_PREFERENCES_UPDATED],
+    "match-service-group",
+    async (topic, payload) => {
+      if (topic === TOPICS.MATCH_PREFERENCES_UPDATED) {
+        const event = payload as unknown as MatchPreferencesUpdatedV1;
+        if (
+          event.schemaVersion !== 1 ||
+          event.eventType !== "MATCH_PREFERENCES_UPDATED" ||
+          !event.eventId ||
+          !event.userId
+        ) {
+          console.error("[Kafka] Ignoring invalid match preference event", payload);
+          return;
+        }
+        if (await redisClient.exists(PROCESSED_EVENT_KEY(event.eventId))) return;
+        await syncUserCache(event.userId);
+        await redisClient.set(PROCESSED_EVENT_KEY(event.eventId), "1", "EX", EVENT_TTL_SECONDS);
+        return;
+      }
 
-	// Listen to Profile Parser updates
-	await subscribe<{ userId: string }>(
-		[TOPICS.PROFILE_UPDATED, TOPICS.USER_UPDATED],
-		"match-service-group",
-		async (topic, payload) => {
-			// payload is already parsed and typed as { userId: string }!
-			console.log(
-				`\n🔔 [Kafka] Doorbell rang on [${topic}] for user: ${payload.userId}`,
-			);
-			await syncUserCache(payload.userId);
-		},
-	);
+      const userId = typeof payload.userId === "string" ? payload.userId : null;
+      if (!userId) {
+        console.error(`[Kafka] Ignoring ${topic} event without userId`);
+        return;
+      }
+      await syncUserCache(userId);
+    },
+  );
 }

@@ -1,66 +1,56 @@
 import type { Request, Response } from "express";
-import { getRankedCandidates, getSimilarCandidates } from "../services/engine/ranker";
-import type { IntentType } from "db/client";
+import {
+  getRankedCandidates,
+  getSimilarCandidates,
+  MatchEngineError,
+} from "../services/engine/ranker";
 
-export const getCandidates = async (req: Request, res: Response) => {
-    try {
-        const requesterId = req.user!.id;
-        
-        // Extract query parameters with defaults
-        const intentType = req.query.intentType as IntentType;
-        const page = parseInt(req.query.page as string) || 1;
-        const limit = parseInt(req.query.limit as string) || 20;
-        const ratingMin = req.query.ratingMin ? parseInt(req.query.ratingMin as string) : undefined;
-        const ratingMax = req.query.ratingMax ? parseInt(req.query.ratingMax as string) : undefined;
+function parsePositiveInteger(value: unknown, fallback: number) {
+  if (value === undefined) return fallback;
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
 
-        if (!intentType) {
-            return res.status(400).json({ success: false, message: "intentType query parameter is required" });
-        }
+function parseRevision(value: unknown) {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+}
 
-        const result = await getRankedCandidates(
-            requesterId,
-            intentType,
-            page,
-            limit,
-            ratingMin,
-            ratingMax
-        );
-
-        // If totalAvailable is 0 and they requested page 1, they either have an incomplete profile 
-        // or the pool is genuinely empty even after relaxation.
-        if (result.totalAvailable === 0 && page === 1) {
-            return res.status(200).json({
-                success: true,
-                message: "No candidates available or profile incomplete.",
-                data: result
-            });
-        }
-
-        return res.status(200).json({ success: true, data: result });
-
-    } catch (error) {
-        console.error("[getCandidates Handler] Error:", error);
-        return res.status(500).json({ success: false, message: "Internal Server Error" });
+async function handleCandidates(req: Request, res: Response, explore: boolean) {
+  try {
+    const page = parsePositiveInteger(req.query.page, 1);
+    const requestedLimit = parsePositiveInteger(req.query.limit, 20);
+    const intentRevision = parseRevision(req.query.intentRevision);
+    if (page === null || requestedLimit === null || intentRevision === null) {
+      return res.status(400).json({
+        success: false,
+        code: "INVALID_PAGINATION",
+        message: "page and limit must be positive integers; intentRevision must be a non-negative integer",
+      });
     }
-};
-
-export const getSimilar = async (req: Request, res: Response) => {
-    try {
-        const requesterId = req.user!.id;
-        
-        const page = parseInt(req.query.page as string) || 1;
-        const limit = parseInt(req.query.limit as string) || 20;
-
-        const result = await getSimilarCandidates(
-            requesterId,
-            page,
-            limit
-        );
-
-        return res.status(200).json({ success: true, data: result });
-
-    } catch (error) {
-        console.error("[getSimilar Handler] Error:", error);
-        return res.status(500).json({ success: false, message: "Internal Server Error" });
+    const limit = Math.min(requestedLimit, 50);
+    const result = explore
+      ? await getSimilarCandidates(req.user!.id, page, limit, intentRevision)
+      : await getRankedCandidates(req.user!.id, page, limit, intentRevision);
+    return res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof MatchEngineError) {
+      return res.status(error.status).json({
+        success: false,
+        code: error.code,
+        message: error.message,
+      });
     }
-};
+    console.error("[Candidates] Error", error);
+    return res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+}
+
+export const getCandidates = (req: Request, res: Response) =>
+  handleCandidates(req, res, false);
+
+export const getSimilar = (req: Request, res: Response) =>
+  handleCandidates(req, res, true);

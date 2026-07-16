@@ -4,12 +4,50 @@ export interface VectorProfile {
     cfRating?: number | null;
 }
 
+export type IntentType = 'DSA' | 'HACKATHON' | 'PROJECT' | 'OPENSOURCE';
+export type Compatibility = 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+export type LevelSource = 'CODEFORCES' | 'LEETCODE' | 'MIXED_CP' | 'GITHUB' | 'UNKNOWN';
+export type MatchTier = 'STRICT' | 'RELAXED_PREFERENCES';
+
+export interface IntentPreferences {
+    intentType: IntentType;
+    ratingMin?: number;
+    ratingMax?: number;
+    preferredLanguages: string[];
+    preferredDomains: string[];
+}
+
+export interface IntentState {
+    searchIntent: IntentPreferences | null;
+    openToIntents: IntentType[];
+    effectiveOpenToIntents: IntentType[];
+    revision: number;
+}
+
+export interface MatchPreferencesUpdatedV1 {
+    eventId: string;
+    schemaVersion: 1;
+    eventType: 'MATCH_PREFERENCES_UPDATED';
+    userId: string;
+    revision: number;
+    occurredAt: string;
+}
+
 export const SKILL_VECTOR_VERSION = 1;
 
-const LANGUAGES = ['typescript','javascript','python','java','cpp','go','rust','kotlin'];
-const FRAMEWORKS = ['react','node','django','spring','flutter','nextjs'];
-const DOMAINS = ['dsa','web','ml','mobile','devops','blockchain'];
+export const SKILL_LANGUAGES = ['typescript','javascript','python','java','cpp','go','rust','kotlin'] as const;
+export const SKILL_FRAMEWORKS = ['react','node','django','spring','flutter','nextjs'] as const;
+export const SKILL_DOMAINS = ['dsa','web','ml','mobile','devops','blockchain'] as const;
+const LANGUAGES = SKILL_LANGUAGES;
+const FRAMEWORKS = SKILL_FRAMEWORKS;
+const DOMAINS = SKILL_DOMAINS;
 export const SKILL_VECTOR_DIMENSIONS = LANGUAGES.length + FRAMEWORKS.length + DOMAINS.length + 2;
+export const SKILL_VECTOR_FEATURE_DIMENSIONS = LANGUAGES.length + FRAMEWORKS.length + DOMAINS.length;
+export const SKILL_LANGUAGE_INDICES = LANGUAGES.map((_, index) => index);
+export const SKILL_TECHNICAL_INDICES = Array.from(
+    { length: SKILL_VECTOR_FEATURE_DIMENSIONS },
+    (_, index) => index,
+);
 
 /** Maps UI labels and provider-specific spellings to the matching taxonomy. */
 const SKILL_ALIASES: Record<string, string> = {
@@ -44,6 +82,33 @@ export function normalizeSkillTags(rawTags: readonly string[] | null | undefined
         normalized.add(SKILL_ALIASES[tag] ?? tag);
     }
     return [...normalized];
+}
+
+export function normalizePreferredLanguages(rawTags: readonly string[] | null | undefined): string[] {
+    const languages = new Set<string>(LANGUAGES);
+    return normalizeSkillTags(rawTags).filter((tag) => languages.has(tag));
+}
+
+export function normalizePreferredDomains(rawTags: readonly string[] | null | undefined): string[] {
+    const domains = new Set<string>(DOMAINS);
+    return normalizeSkillTags(rawTags).filter((tag) => domains.has(tag));
+}
+
+export function classifyCanonicalSkills(rawTags: readonly string[] | null | undefined) {
+    const tags = normalizeSkillTags(rawTags);
+    const languageSet = new Set<string>(LANGUAGES);
+    const frameworkSet = new Set<string>(FRAMEWORKS);
+    const domainSet = new Set<string>(DOMAINS);
+    return {
+        all: tags.filter((tag) => languageSet.has(tag) || frameworkSet.has(tag) || domainSet.has(tag)),
+        languages: tags.filter((tag) => languageSet.has(tag)),
+        frameworks: tags.filter((tag) => frameworkSet.has(tag)),
+        domains: tags.filter((tag) => domainSet.has(tag)),
+    };
+}
+
+export function projectSkillVector(vector: readonly number[], indices: readonly number[]): number[] {
+    return indices.map((index) => vector[index] ?? 0);
 }
 
 /** Converts a lower-is-better LeetCode global rank into a bounded skill score. */

@@ -8,6 +8,7 @@ import { useToken } from "@/hooks/useToken";
 import type { UserProfile } from "@/lib/types";
 import { CompletenessWidget } from "@/app/components/profile/CompletenessWidget";
 import { GitHubActivity } from "@/app/components/profile/GitHubActivity";
+import { IntentSettings } from "@/app/components/profile/IntentSettings";
 
 const SKILLS_POOL = [
   "TypeScript",
@@ -296,6 +297,7 @@ export default function ProfilePage() {
       </div>
 
       <div className="space-y-6">
+        <IntentSettings />
         {/* Profile completeness */}
         {null}
 

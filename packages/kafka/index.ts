@@ -10,6 +10,7 @@ export const TOPICS = {
 	USER_UPDATED: "user.updated",
 	MATCH_ACCEPTED: "match.accepted",
 	MATCH_REJECTED: "match.rejected",
+	MATCH_PREFERENCES_UPDATED: "match-preferences.updated",
 } as const;
 
 const kafkaClient = new Kafka({

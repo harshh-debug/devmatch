@@ -26,9 +26,9 @@ export const profileHandler = {
 			}
 
 			const userId = req.user.id;
-			const [user, activeIntent] = await Promise.all([
+			const [user, searchIntent] = await Promise.all([
 				profileService.getProfileByUserId(userId),
-				intentService.getActiveIntent(userId),
+				intentService.getSearchIntent(userId),
 			]);
 
 			if (!user) {
@@ -36,7 +36,8 @@ export const profileHandler = {
 			}
 			res.json({
 				...user,
-				intentType: activeIntent?.intentType ?? null,
+				searchIntentType: searchIntent?.intentType ?? null,
+				intentType: searchIntent?.intentType ?? null,
 			});
 		} catch (error) {
 			next(error);
@@ -106,6 +107,7 @@ export const profileHandler = {
 			);
 
 			await profileService.computeProfileScore(userId);
+			await publish(TOPICS.USER_UPDATED, { userId });
 
 			res.json(updatedUser);
 		} catch (error) {

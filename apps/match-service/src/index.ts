@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { matchRoutes } from "./routes/match.routes";
-import { warmVectorCache } from "./services/cache/vectorCache";
+import { startCacheReconciliation, warmVectorCache } from "./services/cache/vectorCache";
 import { startKafkaConsumers } from "./services/kafka/consumer";
 import { createTopicsIfNotExist } from "@devmatch/kafka";
 
@@ -33,6 +33,7 @@ async function bootstrap() {
         await warmVectorCache();
         await createTopicsIfNotExist();
         await startKafkaConsumers();
+        startCacheReconciliation();
 
         app.listen(PORT, () => {
             console.log(`✅ Match Service is running on http://localhost:${PORT}`);
