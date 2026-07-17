@@ -58,9 +58,64 @@ enum MatchLevelSource {
   UNKNOWN
 }
 
-enum MatchTier {
-  STRICT
-  RELAXED_PREFERENCES
+enum CollaborationMode {
+  SIMILAR
+  COMPLEMENTARY
+  EITHER
+}
+
+enum CollaborationRole {
+  FRONTEND
+  BACKEND
+  FULL_STACK
+  MOBILE
+  ML_AI
+  DATA
+  DEVOPS_CLOUD
+  BLOCKCHAIN
+  UI_UX
+  TESTING_QA
+  PRODUCT
+}
+
+enum DsaGoal {
+  INTERVIEW_PREP
+  COMPETITIVE_PROGRAMMING
+}
+
+enum DsaProviderPreference {
+  CODEFORCES
+  LEETCODE
+  EITHER
+}
+
+enum OpenSourceContributionType {
+  CODE
+  DOCUMENTATION
+  TESTING
+  DEVOPS_CI
+  DESIGN
+  ISSUE_TRIAGE
+  PROJECT_MAINTENANCE
+}
+
+enum ResolvedMatchMode {
+  SIMILAR
+  COMPLEMENTARY
+  DIRECT
+}
+
+enum ConnectionContext {
+  DSA
+  HACKATHON
+  PROJECT
+  OPENSOURCE
+  GENERAL
+}
+
+enum ConnectionStatus {
+  PENDING
+  MATCHED
 }
 
 enum MessageType {
@@ -86,6 +141,7 @@ model User{
   profile      Profile?
   searchIntent SearchIntent?
   openToIntents OpenToIntent[]
+  intentConfigurations IntentConfiguration[]
   matchesAsA   Match[]       @relation("MatchUserA")
   matchesAsB   Match[]       @relation("MatchUserB")
 }
@@ -116,15 +172,54 @@ model Profile {
     updatedAt          DateTime @default(now()) @updatedAt
   }
 model SearchIntent {
-  userId             String     @id
-  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  intentType         IntentType
-  ratingMin          Int?
-  ratingMax          Int?
-  preferredLanguages String[]
-  preferredDomains   String[]
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
+  userId     String     @id
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intentType IntentType
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model IntentConfiguration {
+  userId     String
+  intentType IntentType
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  offeredLanguages         String[]                     @default([])
+  offeredFrameworks        String[]                     @default([])
+  offeredDomains           String[]                     @default([])
+  offeredRoles             CollaborationRole[]          @default([])
+  offeredDsaGoals          DsaGoal[]                    @default([])
+  offeredContributionTypes OpenSourceContributionType[] @default([])
+  offeredRepositoryTopics  String[]                     @default([])
+
+  requiredLanguages         String[]                     @default([])
+  requiredFrameworks        String[]                     @default([])
+  requiredDomains           String[]                     @default([])
+  requiredRoles             CollaborationRole[]          @default([])
+  requiredDsaGoals          DsaGoal[]                    @default([])
+  requiredContributionTypes OpenSourceContributionType[] @default([])
+  requiredRepositoryTopics  String[]                     @default([])
+
+  niceToHaveLanguages         String[]                     @default([])
+  niceToHaveFrameworks        String[]                     @default([])
+  niceToHaveDomains           String[]                     @default([])
+  niceToHaveRoles             CollaborationRole[]          @default([])
+  niceToHaveDsaGoals          DsaGoal[]                    @default([])
+  niceToHaveContributionTypes OpenSourceContributionType[] @default([])
+  niceToHaveRepositoryTopics  String[]                     @default([])
+
+  collaborationMode       CollaborationMode?
+  dsaProviderPreference   DsaProviderPreference?
+  codeforcesRatingMin     Int?
+  codeforcesRatingMax     Int?
+  leetcodeGlobalRankBest  Int?
+  leetcodeGlobalRankWorst Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, intentType])
+  @@index([intentType])
 }
 
 model OpenToIntent {
@@ -167,36 +262,68 @@ model Match {
   similarityScore Float?
   compatibility MatchCompatibility?
   levelSource MatchLevelSource?
-  matchTier MatchTier?
-  matchedSkills String[]
-  matchedLanguages String[]
-  matchedDomains String[]
+  resolvedMatchMode ResolvedMatchMode?
+  matchedSkills String[] @default([])
+  matchedLanguages String[] @default([])
+  matchedFrameworks String[] @default([])
+  matchedDomains String[] @default([])
+  matchedRoles CollaborationRole[] @default([])
+  matchedDsaGoals DsaGoal[] @default([])
+  matchedContributionTypes OpenSourceContributionType[] @default([])
+  matchedRepositoryTopics String[] @default([])
+  niceToHaveMatchedGroups Int?
+  niceToHaveTotalGroups Int?
+  niceToHaveMatchedValues Int?
   explanation Json?
-  intentType     IntentType
+  intentType     IntentType?
+  connectionContext ConnectionContext
   status         MatchStatus @default(PENDING)
   matchedAt      DateTime?
   initiatedBy    String
   createdAt      DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   chatRoom        ChatRoom?
-  @@unique([userAId, userBId,intentType])
+  @@unique([userAId, userBId])
 }
 model MatchAction {
   id          String       @id @default(uuid())
   actorId     String
   targetId    String
   action      ActionType
-  intentType  IntentType
+  intentType  IntentType?
+  connectionContext ConnectionContext
   similarityScore Float?
   compatibility MatchCompatibility?
   levelSource MatchLevelSource?
-  matchTier MatchTier?
-  matchedSkills String[]
-  matchedLanguages String[]
-  matchedDomains String[]
+  resolvedMatchMode ResolvedMatchMode?
+  matchedSkills String[] @default([])
+  matchedLanguages String[] @default([])
+  matchedFrameworks String[] @default([])
+  matchedDomains String[] @default([])
+  matchedRoles CollaborationRole[] @default([])
+  matchedDsaGoals DsaGoal[] @default([])
+  matchedContributionTypes OpenSourceContributionType[] @default([])
+  matchedRepositoryTopics String[] @default([])
+  niceToHaveMatchedGroups Int?
+  niceToHaveTotalGroups Int?
+  niceToHaveMatchedValues Int?
   explanation Json?
   createdAt   DateTime     @default(now())
-  @@unique([actorId, targetId, intentType])
+  @@unique([actorId, targetId, connectionContext])
+}
+
+model ConnectionPair {
+  pairKey           String           @id
+  userAId           String
+  userBId           String
+  connectionContext ConnectionContext
+  status            ConnectionStatus @default(PENDING)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([userAId])
+  @@index([userBId])
+  @@index([status])
 }
  
 // ── CHAT SERVICE DOMAIN ──────────────────────────────────────

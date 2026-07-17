@@ -29,7 +29,7 @@ export const getRooms = async (req: Request, res: Response) => {
           select: {
             userAId: true,
             userBId: true,
-            intentType: true,
+            connectionContext: true,
           },
         },
         messages: {
@@ -59,7 +59,8 @@ export const getRooms = async (req: Request, res: Response) => {
       return {
         id: room.id,
         matchId: room.matchId,
-        intentType: room.match?.intentType ?? null,
+        // General connections intentionally have no intent label in chat.
+        intentType: room.match?.connectionContext === "GENERAL" ? null : room.match?.connectionContext ?? null,
         otherUserId:
           room.match?.userAId === userId
             ? room.match?.userBId

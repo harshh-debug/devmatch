@@ -1,6 +1,6 @@
 // src/services/kafka/producer.ts
 import { publish, TOPICS } from "@devmatch/kafka";
-import type { IntentType } from "db/client";
+import type { ConnectionContext } from "db/client";
 
 /**
  * Broadcasts a mutual match so the Chat Service can create a room.
@@ -9,7 +9,7 @@ export async function publishMatchAccepted(
     matchId: string,
     userAId: string,
     userBId: string,
-    intentType: IntentType,
+    connectionContext: ConnectionContext,
     similarityScore: number
 ) {
     try {
@@ -17,7 +17,7 @@ export async function publishMatchAccepted(
             matchId,
             userAId,
             userBId,
-            intentType,
+            connectionContext,
             similarityScore,
             timestamp: new Date().toISOString()
         });
@@ -35,13 +35,13 @@ export async function publishMatchAccepted(
 export async function publishMatchRejected(
     actorId: string,
     targetId: string,
-    intentType: IntentType
+    connectionContext: ConnectionContext
 ) {
     try {
         await publish(TOPICS.MATCH_REJECTED, {
             actorId,
             targetId,
-            intentType,
+            connectionContext,
             timestamp: new Date().toISOString()
         });
     } catch (error) {

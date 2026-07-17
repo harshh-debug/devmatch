@@ -67,7 +67,7 @@ export default function MatchesPage() {
                 <p className="text-[11px] text-muted">@{user?.username || "unknown"}</p>
               </div>
               <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
-                {match.intentType}
+                {match.connectionContext || match.intentType}
               </span>
             </div>
 

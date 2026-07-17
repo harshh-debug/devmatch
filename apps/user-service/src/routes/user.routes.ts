@@ -19,6 +19,7 @@ userRouter.get('/users/username-availability', extractUser, profileHandler.check
 
 // Intent Management
 userRouter.get('/users/me/intents', extractUser, intentHandler.getIntents);
+userRouter.put('/users/me/intent-configurations/:intentType', extractUser, intentHandler.putIntentConfiguration);
 userRouter.put('/users/me/search-intent', extractUser, intentHandler.setSearchIntent);
 userRouter.delete('/users/me/search-intent', extractUser, intentHandler.deleteSearchIntent);
 userRouter.put('/users/me/open-to', extractUser, intentHandler.replaceOpenTo);

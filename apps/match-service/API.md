@@ -52,13 +52,9 @@ The Match Service never validates JWTs directly.
 ```json
 {
   "success": false,
+  "code": "INTENT_CONFIGURATION_REQUIRED",
   "message": "Human readable message",
-  "errors": [
-    {
-      "field": "ratingMin",
-      "issue": "Must be positive"
-    }
-  ]
+  "details": {}
 }
 ```
 
@@ -113,9 +109,7 @@ Returns a ranked list of recommended developers.
 
 | Parameter | Type | Required | Description |
 |------------|------|----------|-------------|
-| intentType | IntentType | ✅ | Matching intent |
-| ratingMin | number | ❌ | Minimum Codeforces rating |
-| ratingMax | number | ❌ | Maximum Codeforces rating |
+| intentRevision | number | ❌ | Latest revision returned by `/users/me/intents`; stale cache entries are reconstructed |
 | limit | number | ❌ | Default 20 (max 50) |
 | page | number | ❌ | Default 1 |
 
@@ -124,7 +118,7 @@ Returns a ranked list of recommended developers.
 ## Example Request
 
 ```http
-GET /api/v1/match/candidates?intentType=DSA&ratingMin=1400&ratingMax=1600
+GET /api/v1/match/candidates?intentRevision=12&limit=20&page=1
 ```
 
 ---
@@ -140,17 +134,30 @@ GET /api/v1/match/candidates?intentType=DSA&ratingMin=1400&ratingMax=1600
         "userId": "uuid",
         "username": "coder_aman",
         "displayName": "Aman Singh",
-        "similarityScore": 0.988,
+        "technicalFitScore": 1,
+        "similarityScore": 1,
+        "compatibility": "HIGH",
+        "levelBand": "NEAR",
+        "levelSource": "CODEFORCES",
+        "resolvedMatchMode": "DIRECT",
         "cfRating": 1550,
         "profileScore": 90,
-        "skillTags": [
-          "React",
-          "TypeScript"
-        ]
+        "matchedLanguages": ["cpp"],
+        "matchedGoals": ["INTERVIEW_PREP"],
+        "matchedFrameworks": [],
+        "matchedDomains": [],
+        "matchedRoles": [],
+        "matchedContributionTypes": [],
+        "matchedRepositoryTopics": [],
+        "niceToHave": {
+          "matchedGroupCount": 0,
+          "totalGroupCount": 1,
+          "matchedValueCount": 0
+        },
+        "capabilityEvidence": [],
+        "reasonCodes": ["DSA_REQUIRED_CAPABILITIES_MATCHED"]
       }
     ],
-    "relaxed": false,
-    "relaxedStartIndex": 1,
     "totalAvailable": 1
   }
 }
@@ -160,10 +167,12 @@ GET /api/v1/match/candidates?intentType=DSA&ratingMin=1400&ratingMax=1600
 
 ## Notes
 
-- Results are sorted by similarity score.
+- The active intent and its retained configuration come from `/users/me/intents`.
+- Required groups filter candidates. Values within a group use OR; non-empty groups use AND.
+- Nice-to-have values never filter and affect deterministic ordering only.
+- Results sort by compatibility, nice-to-have group/value counts, technical fit, profile score, and user ID.
 - Previously seen users are excluded.
 - Supports pagination.
-- Progressive relaxation is automatically applied if no suitable candidates exist.
 
 ---
 
@@ -171,7 +180,8 @@ GET /api/v1/match/candidates?intentType=DSA&ratingMin=1400&ratingMax=1600
 
 | Status | Description |
 |---------|-------------|
-| 400 | Invalid query parameters |
+| 400 | Invalid pagination/revision parameters |
+| 409 | Search intent or complete intent configuration required |
 | 500 | Internal server error |
 
 ---

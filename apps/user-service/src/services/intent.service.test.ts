@@ -20,25 +20,55 @@ describe("directional intent persistence", () => {
     });
     createdUserIds.push(user.id);
 
-    const searched = await intentService.setSearchIntent(user.id, {
+    const searched = await intentService.activateSearchIntent(user.id, "DSA", {
       intentType: "DSA",
-      preferredLanguages: ["C++", "c++", "Python"],
+      offer: {
+        languages: ["cpp", "python"],
+        goals: ["INTERVIEW_PREP"],
+      },
+      search: {
+        requiredLanguages: ["cpp", "python"],
+        requiredGoals: ["INTERVIEW_PREP"],
+        niceToHaveLanguages: [],
+        niceToHaveGoals: [],
+        providerPreference: "EITHER",
+      },
     });
-    expect(searched.searchIntent?.preferredLanguages).toEqual(["cpp", "python"]);
+    expect(searched.searchIntent?.intentType).toBe("DSA");
+    expect(searched.configurations.DSA?.offer.languages).toEqual(["cpp", "python"]);
     expect(searched.openToIntents).toEqual([]);
     expect(searched.effectiveOpenToIntents).toEqual(["DSA"]);
 
+    await intentService.saveIntentConfiguration(user.id, {
+      intentType: "PROJECT",
+      offer: {
+        roles: ["FRONTEND"],
+        languages: ["typescript"],
+        frameworks: ["react"],
+        domains: ["web"],
+      },
+      search: {
+        collaborationMode: "SIMILAR",
+        requiredRoles: ["FRONTEND"],
+        requiredLanguages: ["typescript"],
+        requiredFrameworks: [],
+        requiredDomains: [],
+        niceToHaveRoles: [],
+        niceToHaveLanguages: [],
+        niceToHaveFrameworks: [],
+        niceToHaveDomains: [],
+      },
+    });
     const opened = await intentService.replaceOpenToIntents(user.id, [
       "PROJECT",
       "PROJECT",
-      "OPENSOURCE",
     ]);
     expect(opened.searchIntent?.intentType).toBe("DSA");
-    expect(opened.openToIntents).toEqual(["PROJECT", "OPENSOURCE"]);
+    expect(opened.openToIntents).toEqual(["PROJECT"]);
     expect(new Set(opened.effectiveOpenToIntents)).toEqual(
-      new Set(["DSA", "PROJECT", "OPENSOURCE"]),
+      new Set(["DSA", "PROJECT"]),
     );
-    expect(opened.revision).toBe(searched.revision + 1);
+    expect(opened.revision).toBe(searched.revision + 2);
 
     const passive = await intentService.deleteSearchIntent(user.id);
     expect(passive.searchIntent).toBeNull();
@@ -48,6 +78,6 @@ describe("directional intent persistence", () => {
     const outboxRows = await prismaClient.outboxEvent.count({
       where: { aggregateId: user.id },
     });
-    expect(outboxRows).toBe(3);
+    expect(outboxRows).toBe(4);
   });
 });

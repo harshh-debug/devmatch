@@ -1,12 +1,28 @@
 import type {
+  CapabilityEvidence,
+  CollaborationRole,
   Compatibility,
-  IntentPreferences,
+  DsaGoal,
+  IntentConfiguration,
   IntentType,
   LevelSource,
-  MatchTier,
+  NiceToHaveMatch,
+  OpenSourceContributionType,
+  ResolvedMatchMode,
 } from "@devmatch/shared";
 
-export type { Compatibility, IntentPreferences, IntentType, LevelSource, MatchTier };
+export type {
+  CapabilityEvidence,
+  CollaborationRole,
+  Compatibility,
+  DsaGoal,
+  IntentConfiguration,
+  IntentType,
+  LevelSource,
+  NiceToHaveMatch,
+  OpenSourceContributionType,
+  ResolvedMatchMode,
+};
 export type Availability = "ACTIVE" | "OPEN" | "BUSY";
 
 export interface MatchProfile {
@@ -24,7 +40,8 @@ export interface MatchProfile {
   availability: Availability;
   profileScore: number;
   matchPreferencesRevision: number;
-  searchIntent: IntentPreferences | null;
+  searchIntent: IntentConfiguration | null;
+  intentConfigurations: Partial<Record<IntentType, IntentConfiguration>>;
   openToIntents: IntentType[];
   effectiveOpenToIntents: IntentType[];
   github: {
@@ -38,29 +55,42 @@ export interface MatchProfile {
   };
 }
 
-export interface CandidateResult extends MatchProfile {
-  similarityScore: number;
-  compatibility: Compatibility;
+export interface CandidateResult extends MatchProfile, RecommendationSnapshot {
+  technicalFitScore: number;
   levelBand: "NEAR" | "MID" | "FAR" | "UNKNOWN";
-  levelSource: LevelSource;
-  matchedSkills: string[];
-  matchedLanguages: string[];
-  matchedDomains: string[];
-  matchTier: MatchTier;
+}
+
+export interface ExploreCandidateResult extends MatchProfile {
+  similarityScore: number;
+  sharedSkills: string[];
+  sharedSkillCount: number;
+  experienceProximity: number;
+  experienceSource: "CODEFORCES" | "LEETCODE" | "GITHUB" | "UNKNOWN";
 }
 
 export interface RecommendationSnapshot {
   similarityScore: number;
+  technicalFitScore: number;
   compatibility: Compatibility;
   levelSource: LevelSource;
+  resolvedMatchMode: ResolvedMatchMode;
   matchedSkills: string[];
   matchedLanguages: string[];
+  matchedFrameworks: string[];
   matchedDomains: string[];
-  matchTier: MatchTier;
+  matchedRoles: CollaborationRole[];
+  matchedGoals: DsaGoal[];
+  matchedContributionTypes: OpenSourceContributionType[];
+  matchedRepositoryTopics: string[];
+  niceToHave: NiceToHaveMatch;
+  capabilityEvidence: CapabilityEvidence[];
+  reasonCodes: string[];
   explanation: {
     intentType: IntentType;
     compatibility: Compatibility;
     levelSource: LevelSource;
-    matchTier: MatchTier;
+    resolvedMatchMode: ResolvedMatchMode;
+    reasonCodes: string[];
+    capabilityEvidence: CapabilityEvidence[];
   };
 }

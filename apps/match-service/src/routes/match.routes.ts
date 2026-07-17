@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { extractUser } from "../middleware/extractUser";
-import { getCandidates, getSimilar } from "../handlers/candidates.handler";
+import { getCandidates, getExplore, getSimilar } from "../handlers/candidates.handler";
 import { postMatchAction } from "../handlers/action.handler";
 import { getMatchesList } from "../handlers/matches.handler";
 import { getRequests } from "../handlers/requests.handler";
@@ -12,6 +12,7 @@ matchRoutes.use(extractUser);
 
 matchRoutes.get("/candidates", getCandidates);
 matchRoutes.get("/similar", getSimilar);
+matchRoutes.get("/explore", getExplore);
 matchRoutes.post("/action", postMatchAction);
 matchRoutes.get("/matches", getMatchesList);
 matchRoutes.get("/requests", getRequests);

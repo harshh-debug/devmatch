@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { ActionType, IntentType } from "db/client";
+import { ActionType, ConnectionContext } from "db/client";
 import {
   MatchActionError,
   processMatchAction,
@@ -8,15 +8,18 @@ import {
 export const postMatchAction = async (req: Request, res: Response) => {
   try {
     const actorId = req.user!.id;
-    const { targetId, action, intentType } = req.body as Record<string, unknown>;
+    const { targetId, action, connectionContext, intentType } = req.body as Record<string, unknown>;
+    // intentType is accepted for older clients, but all new actions carry an
+    // explicit connection context (including GENERAL for Explore).
+    const context = connectionContext ?? intentType;
     if (
       typeof targetId !== "string" ||
       !Object.values(ActionType).includes(action as ActionType) ||
-      !Object.values(IntentType).includes(intentType as IntentType)
+      !Object.values(ConnectionContext).includes(context as ConnectionContext)
     ) {
       return res.status(400).json({
         success: false,
-        message: "targetId, action, and intentType are required and must be valid",
+        message: "targetId, action, and connectionContext are required and must be valid",
       });
     }
     if (actorId === targetId) {
@@ -26,7 +29,7 @@ export const postMatchAction = async (req: Request, res: Response) => {
       actorId,
       targetId,
       action as ActionType,
-      intentType as IntentType,
+      context as ConnectionContext,
     );
     return res.status(200).json({ success: true, data: result });
   } catch (error) {

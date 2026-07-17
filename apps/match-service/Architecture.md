@@ -1,6 +1,8 @@
 # 🚀 DevMatch — Match Service
 
-> A high-performance, event-driven matchmaking engine that connects developers based on **technical compatibility**, **intent**, and **skill similarity** using vector-based recommendations.
+> A high-performance, event-driven matchmaking engine that connects developers using retained intent-specific offer profiles and partner preferences.
+
+> **Current model (July 2026):** each user may retain one `IntentConfiguration` for each of DSA, Project, Hackathon, and Open Source. `SearchIntent` only selects the active intent; `OpenToIntent` selects explicit inbound intents. Required capability groups are hard filters, nice-to-have groups rank only, and Project/Hackathon resolve `SIMILAR`, `COMPLEMENTARY`, or `EITHER`. The older generic `MatchIntent`, rating-query, and progressive-relaxation descriptions later in this historical document are superseded by this model.
 
 ---
 
@@ -19,9 +21,9 @@
 
 The **Match Service** is the recommendation engine powering DevMatch.
 
-Unlike traditional matchmaking platforms that rely on generic filters or random discovery, this service performs **intent-aware semantic matching** using vector similarity and progressive filtering.
+Unlike traditional matchmaking platforms that rely on generic filters or random discovery, this service performs deterministic intent-aware matching using explicit capability coverage and compatibility bands.
 
-Every developer can maintain multiple **Match Intents** (Hackathons, Open Source, Competitive Programming, Freelancing, etc.), allowing recommendations to be contextual rather than generic.
+Every developer can retain configurations for DSA, Project, Hackathon, and Open Source while selecting one active outbound search intent.
 
 Instead of continuously querying relational data during every recommendation request, the service maintains an optimized Redis representation of the active matching pool and performs in-memory vector calculations for extremely low latency.
 
@@ -74,9 +76,9 @@ The recommendation score is generated using **Cosine Similarity**, producing val
 
 ---
 
-## 🔄 Progressive Relaxation
+## Required and nice-to-have preferences
 
-Strict filtering often produces empty candidate pools.
+Required capability groups determine eligibility. Nice-to-have values never remove candidates or create a relaxed tier; they improve deterministic ordering within compatibility bands.
 
 To prevent poor user experience, the recommendation engine gradually relaxes constraints until enough candidates are available.
 

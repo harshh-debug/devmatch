@@ -1,119 +1,179 @@
 # DevMatch Agent Guide
 
-## Product purpose
+## Project overview
 
-DevMatch helps developers find collaborators at a comparable experience level. Recommendations should be technically relevant and level-appropriate: a competitive programmer should see similarly capable competitive programmers, while a project, hackathon, or open-source search should consider both stack compatibility and GitHub-derived development experience.
+DevMatch is a full-stack platform that helps developers find technically relevant collaborators at a comparable experience level.
 
-Matching is deterministic and explainable. Do not introduce ML models or opaque learned ranking unless the product direction explicitly changes.
+The application includes frontend, backend, database, caching, background processing, and external-provider integrations. Changes must remain compatible across the complete stack.
 
-The product exposes two independent recommendation signals:
+## Core engineering rules
 
-- `compatibility` is experience-level proximity: HIGH/NEAR, MEDIUM/MID, LOW/FAR, or UNKNOWN.
-- `similarity` is intent-specific technical overlap expressed as a percentage.
+* Inspect the existing implementation before modifying it.
+* Follow the repository’s current architecture, folder structure, naming conventions, and coding patterns.
+* Extend existing modules instead of creating parallel implementations.
+* Reuse existing components, services, schemas, utilities, and shared types.
+* Avoid unrelated refactors and unnecessary dependencies.
+* Keep changes localized and backward compatible wherever practical.
+* Do not silently change existing API contracts or user-facing behavior.
+* Do not leave dead code, unused imports, duplicate types, or temporary workarounds.
 
-Rank compatibility bands first and similarity within each band. Never combine them into a weighted score.
+## Frontend-to-backend consistency
 
-## Directional intent model
-
-Never conflate what a user is currently searching for with the intents for which that user is willing to appear in someone else's search.
-
-- `searchIntent`: zero or one outbound intent. It controls the user's current Discover feed and its search preferences.
-- `openToIntents`: zero or more inbound intents. They control the searches in which the user may appear as a candidate.
-- `effectiveOpenToIntents`: the union of `openToIntents` and the current `searchIntent`. A user actively searching for an intent is implicitly available to others searching for the same intent.
-
-Example: a user may currently search for `DSA` while being open to inbound matches for `DSA`, `PROJECT`, and `OPENSOURCE`.
-
-Candidate eligibility is directional:
+When changing a feature, trace and update its complete flow where applicable:
 
 ```text
-requester.searchIntent = X
-candidate.effectiveOpenToIntents contains X
+Frontend UI
+→ frontend state/query layer
+→ API client
+→ request validation
+→ backend route/controller
+→ service/domain logic
+→ database/cache/event infrastructure
+→ API response
+→ frontend state and UI
 ```
 
-The candidate's own `searchIntent` does not need to equal the requester's intent.
+When a contract changes, update every affected consumer together:
 
-## Intent lifecycle rules
+* Shared types
+* DTOs and validation schemas
+* API request and response types
+* Frontend API clients
+* Backend handlers and services
+* Database models and migrations
+* Event and queue payloads
+* Tests and fixtures
 
-- Changing `searchIntent` must not overwrite `openToIntents`.
-- Updating `openToIntents` must not change the current Discover feed.
-- A user may have no `searchIntent` and still be passively discoverable through `openToIntents`.
-- A user with a `searchIntent` but no explicit `openToIntents` remains discoverable for that search intent through the implicit union rule.
-- Seen/rejected history remains scoped by intent when the user switches searches.
-- Removing an inbound intent removes the user from new discovery results immediately.
-- Existing pending requests retain their original intent context and remain actionable; new actions must not be created for an intent that was not eligible when the candidate was shown.
-- Matches and match actions always persist the intent that produced the recommendation.
-- Duplicate open-to intents must be prevented and intent updates must be atomic.
+Use the repository’s existing contract source of truth. Do not create duplicate frontend and backend definitions when shared contracts already exist.
 
-## Matching invariants
+## Database changes
 
-- Never use a fallback threshold such as `-1` that admits technically irrelevant candidates.
-- Return fewer results, including an empty result, instead of fabricating compatibility.
-- Validate vector version and dimensions before similarity calculations.
-- Apply identity, availability, block/history, profile-quality, and inbound-intent eligibility before ranking.
-- Ratings and experience levels are distance/eligibility signals, not generic cosine dimensions.
-- Missing data must lower confidence or use a documented fallback; it must never be interpreted as elite or zero-level ability.
-- Relaxation may widen optional ranges in bounded tiers, but must never bypass the absolute technical-overlap floor.
-- Stable order is HIGH compatibility, then MEDIUM, LOW, and UNKNOWN; within each band sort by similarity descending.
-- UNKNOWN means insufficient comparable level data, not low skill.
-- Project and Hackathon may use manual-skill fallback with UNKNOWN level compatibility. Open Source requires usable GitHub data.
+* Use the repository’s existing schema and migration workflow.
+* Keep migrations reproducible.
+* Update generated clients, seeds, fixtures, and dummy data when required.
+* Preserve constraints, indexes, foreign keys, and transaction boundaries.
+* Do not modify the database manually as a substitute for a migration.
+* The current database contains dummy data and has no active production users, but schema changes must still leave the project in a clean and reproducible state.
 
-## Event propagation
+## Events, caching, and background work
 
-PostgreSQL is the source of truth. Intent mutations must commit the intent rows and a transactional outbox record atomically.
+PostgreSQL is the authoritative source of persistent application data unless the existing code explicitly establishes another source of truth.
 
-```text
-PostgreSQL commit
-  → outbox dispatcher
-  → Kafka domain event
-  → Match Service reloads the complete record from PostgreSQL
-  → Redis cache replacement/eviction
-  → frontend query invalidation
-```
+When modifying event-driven or cached flows:
 
-Events carry identifiers and version metadata, not partial cache state. Consumers must be idempotent because outbox delivery is at least once. Match Service startup warm-up and periodic reconciliation must make Redis converge to PostgreSQL after missed, duplicated, or out-of-order events.
+* Preserve transactional consistency.
+* Keep event consumers idempotent.
+* Do not treat event payloads as authoritative cached state unless that is already the established architecture.
+* Account for duplicated, delayed, missed, and out-of-order events.
+* Ensure caches can converge back to the persistent source of truth.
+* Preserve existing retry, reconciliation, and failure-handling behavior.
 
-Intent state carries a monotonically increasing revision. When a frontend request has a newer revision than Redis, Match Service must reload the requester from PostgreSQL before ranking.
+## Matching system constraints
 
-## Intent-specific compatibility
+DevMatch matching is deterministic and explainable.
 
-### DSA
+* Do not introduce ML-based or opaque ranking.
+* Keep eligibility, compatibility, and similarity as distinct concepts.
+* Never fabricate candidates by bypassing mandatory eligibility or technical-relevance requirements.
+* Prefer returning fewer results, including no results, over returning invalid recommendations.
+* Preserve stable and deterministic ordering.
+* Treat missing data explicitly rather than interpreting it as exceptional or zero ability.
+* Matching changes must follow the canonical matching specification referenced by the relevant implementation document.
 
-- Match programming-language compatibility and DSA skills.
-- Compare Codeforces rating and LeetCode global rank as lower-distance level signals. LeetCode global rank is lower-is-better.
-- Support Codeforces-only, LeetCode-only, both-platform, and unrated users explicitly.
-- Respect user-selected rating ranges; use bounded automatic peer bands when no range is supplied.
+Detailed matching behavior, intent semantics, ranking rules, and provider-specific requirements must live in a dedicated specification or implementation document rather than in this file.
 
-### Project
+## Authentication and authorization
 
-- Require meaningful overlap in languages, frameworks, or domains.
-- Use GitHub-derived languages, repository topics, activity, and experience level when available.
-- Competitive-programming ratings must not influence project compatibility.
-- Without usable GitHub data, allow canonical manual-skill matching but mark level compatibility UNKNOWN.
+* Preserve existing authentication and session behavior.
+* Apply authorization at the backend boundary, not only in the frontend.
+* Never trust user identifiers, roles, ownership, or eligibility supplied by the client.
+* Avoid exposing secrets, tokens, private provider data, or internal error details.
+* Follow existing middleware and error-response conventions.
 
-### Hackathon
+## Implementation workflow
 
-- Match languages, frameworks, domains, and GitHub-derived development level.
-- Prefer candidates who can realistically collaborate at a similar pace and experience level.
-- Competitive-programming signals may only be considered when the declared hackathon domain is explicitly algorithmic.
-- Without usable GitHub data, allow canonical manual-skill matching but mark level compatibility UNKNOWN.
+Before making changes:
 
-### Open source
+1. Read the relevant implementation or specification document.
+2. Inspect the affected code paths in the repository.
+3. Trace dependencies across frontend, backend, database, cache, events, and integrations.
+4. Identify the canonical source of truth for contracts and state.
+5. Check whether any requested work has already been implemented.
+6. Note discrepancies between the plan and the current repository.
 
-- Require a connected GitHub profile with usable synced technical data.
-- Match repository languages, topics/domains, activity recency, and GitHub experience level.
-- Keep GitHub languages/topics and GitHub sync time source-specific; Open Source eligibility and similarity must not be satisfied by manual skills or another provider's sync timestamp.
-- Do not treat stars alone as experience; use bounded/log-scaled signals so one popular repository cannot dominate.
+During implementation:
 
-## Same-level principle
-
-Technical overlap answers “can these people work on the same thing?” Level proximity answers “are they likely to be productive peers?” Both conditions matter.
-
-- DSA level comes primarily from Codeforces rating and LeetCode global rank proximity.
-- Project, hackathon, and open-source level comes from bounded GitHub signals such as contribution activity, active contribution weeks, and stars.
-- Level bands must be broad enough for sparse pools but bounded enough to avoid recommending beginners and highly advanced developers as strong peers without evidence.
-- Similarity percentages shown to users must correspond to the same intent-specific calculation used to rank the result.
-- Compatibility controls the primary ranking band; similarity only orders candidates within the same compatibility band.
+1. Make changes in dependency order.
+2. Keep contracts synchronized across layers.
+3. Preserve existing behavior unless a change is explicitly required.
+4. Add or update tests alongside the implementation.
+5. Validate each major stage before continuing.
 
 ## Testing expectations
 
-Changes to matching must include cases for every intent, multiple `openToIntents`, no current search, implicit current-intent discoverability, intent switching, removed inbound intents, missing provider data, mixed provider availability, invalid/vector-version mismatch, bounded relaxation, seen history, busy users, duplicate prevention, and pagination stability.
+Changes must include appropriate regression coverage.
+
+Depending on the affected area, verify:
+
+* Unit behavior
+* Request validation
+* Authentication and authorization
+* Service and domain logic
+* Database constraints and transactions
+* API integration
+* Event delivery and idempotency
+* Cache invalidation or replacement
+* Frontend loading, empty, success, and error states
+* End-to-end frontend-to-backend behavior
+* Pagination and deterministic ordering
+* Existing flows affected by the change
+* End to end testing at last
+
+Do not add placeholder tests that only assert that code executes.
+
+## Validation
+
+Use scripts that actually exist in the repository. Inspect the root and workspace `package.json` files before running commands.
+
+At minimum, confirm where applicable:
+
+* Type checking passes
+* Linting passes
+* Relevant tests pass
+* Database migrations apply successfully
+* Generated clients and types are current
+* Frontend builds successfully
+* Backend builds successfully
+* The application starts from the repository root with:
+
+```bash
+bun dev
+```
+
+* The changed flow works end to end
+* Existing related flows still work
+* Browser and server logs contain no new runtime errors
+
+When instructions conflict, use this precedence:
+
+1. Explicit user instruction
+2. Current implementation document
+3. Stable domain specification
+4. This `AGENTS.md`
+5. Existing repository conventions
+
+Do not assume that an implementation document is accurate if it conflicts with the current codebase. Verify the repository and document any discrepancy before proceeding.
+
+## Completion report
+
+After implementation, report:
+
+* Files created or modified
+* Functional changes
+* Contract and database changes
+* Tests and validation performed
+* Architectural decisions
+* Assumptions
+* Remaining risks, edge cases, or TODOs
+
+Do not claim that a command, build, test, migration, or runtime flow passed unless it was actually executed successfully.

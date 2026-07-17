@@ -26,9 +26,9 @@ export const profileHandler = {
 			}
 
 			const userId = req.user.id;
-			const [user, searchIntent] = await Promise.all([
+			const [user, intentState] = await Promise.all([
 				profileService.getProfileByUserId(userId),
-				intentService.getSearchIntent(userId),
+				intentService.getIntentState(userId),
 			]);
 
 			if (!user) {
@@ -36,8 +36,12 @@ export const profileHandler = {
 			}
 			res.json({
 				...user,
-				searchIntentType: searchIntent?.intentType ?? null,
-				intentType: searchIntent?.intentType ?? null,
+				searchIntentType: intentState.searchIntentType ?? null,
+				intentType: intentState.searchIntentType ?? null,
+				matchingOnboardingComplete: Boolean(
+					intentState.searchIntent?.completeness.offerComplete &&
+					intentState.searchIntent.completeness.searchComplete
+				),
 			});
 		} catch (error) {
 			next(error);

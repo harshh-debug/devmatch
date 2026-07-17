@@ -1,28 +1,36 @@
 /**
  * Frontend-specific types. Shapes mirror the API contract in .claude/API.md.
  */
+import type { ConnectionContext, IntentType } from "@devmatch/shared";
 
 export type Availability = "ACTIVE" | "OPEN" | "BUSY";
 
-export type IntentType = "DSA" | "HACKATHON" | "PROJECT" | "OPENSOURCE";
-export type Compatibility = "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN";
-export type LevelSource = "CODEFORCES" | "LEETCODE" | "MIXED_CP" | "GITHUB" | "UNKNOWN";
-export type MatchTier = "STRICT" | "RELAXED_PREFERENCES";
-
-export interface IntentPreferences {
-  intentType: IntentType;
-  ratingMin?: number;
-  ratingMax?: number;
-  preferredLanguages: string[];
-  preferredDomains: string[];
-}
-
-export interface IntentState {
-  searchIntent: IntentPreferences | null;
-  openToIntents: IntentType[];
-  effectiveOpenToIntents: IntentType[];
-  revision: number;
-}
+export type {
+  BuildOfferProfile,
+  BuildSearchPreferences,
+  CandidateExplanation,
+  CapabilityEvidence,
+  CollaborationMode,
+  CollaborationRole,
+  Compatibility,
+  DsaGoal,
+  DsaIntentConfiguration,
+  DsaOfferProfile,
+  DsaProviderPreference,
+  DsaSearchPreferences,
+  HackathonIntentConfiguration,
+  IntentConfiguration,
+  IntentConfigurationInput,
+  IntentState,
+  IntentType,
+  ConnectionContext,
+  LevelSource,
+  NiceToHaveMatch,
+  OpenSourceContributionType,
+  OpenSourceIntentConfiguration,
+  ProjectIntentConfiguration,
+  ResolvedMatchMode,
+} from "@devmatch/shared";
 
 export type MessageType = "TEXT" | "CODE_SNIPPET" | "LINK";
 
@@ -48,6 +56,7 @@ export interface UserProfile {
   provider?: string;
   skillTags: string[];
   intentType?: IntentType;
+  matchingOnboardingComplete?: boolean;
   leetcodeHandle?: string;
   githubUsername?: string;
   githubHandle?: string;
@@ -92,4 +101,21 @@ export interface ChatRoom {
     senderId: string;
     createdAt: string;
   } | null;
+}
+
+export interface ExploreCandidate {
+  userId: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
+  college: string | null;
+  availability: Availability;
+  profileScore: number;
+  skillTags: string[];
+  similarityScore: number;
+  sharedSkills: string[];
+  sharedSkillCount: number;
+  experienceProximity: number;
+  experienceSource: "CODEFORCES" | "LEETCODE" | "GITHUB" | "UNKNOWN";
 }

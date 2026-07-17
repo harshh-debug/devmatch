@@ -3,14 +3,20 @@ import {
   SKILL_VECTOR_DIMENSIONS,
   SKILL_VECTOR_VERSION,
   classifyCanonicalSkills,
-  type IntentPreferences,
+  deriveRoleEvidence,
+  evaluateConfigurationCompleteness,
+  normalizeRepositoryTopics,
+  type CapabilityEvidence,
+  type IntentConfiguration,
+  type IntentConfigurationInput,
   type IntentType,
+  type VerifiedCapabilities,
 } from "@devmatch/shared";
 import { redisClient } from "./redis";
 import type { MatchProfile } from "../engine/types";
 
 const PROFILES_HASH = "match_profiles";
-const SEEN_KEY = (userId: string, intent: string) => `seen:${userId}:${intent}`;
+const GLOBAL_EXCLUSION_KEY = (userId: string) => `match-excluded:${userId}`;
 const PROFILE_QUALITY_FLOOR = 30;
 
 type DbUser = Awaited<ReturnType<typeof loadUsers>>[number];
@@ -42,36 +48,119 @@ function parseContributionCalendar(value: unknown) {
   };
 }
 
-function toIntentPreferences(intent: DbUser["searchIntent"]): IntentPreferences | null {
-  if (!intent) return null;
+function rowToInput(row: DbUser["intentConfigurations"][number]): IntentConfigurationInput {
+  if (row.intentType === "DSA") {
+    return {
+      intentType: "DSA",
+      offer: { languages: row.offeredLanguages, goals: row.offeredDsaGoals },
+      search: {
+        requiredLanguages: row.requiredLanguages,
+        requiredGoals: row.requiredDsaGoals,
+        niceToHaveLanguages: row.niceToHaveLanguages,
+        niceToHaveGoals: row.niceToHaveDsaGoals,
+        providerPreference: row.dsaProviderPreference ?? "EITHER",
+        ...(row.codeforcesRatingMin !== null ? { codeforcesRatingMin: row.codeforcesRatingMin } : {}),
+        ...(row.codeforcesRatingMax !== null ? { codeforcesRatingMax: row.codeforcesRatingMax } : {}),
+        ...(row.leetcodeGlobalRankBest !== null ? { leetcodeGlobalRankBest: row.leetcodeGlobalRankBest } : {}),
+        ...(row.leetcodeGlobalRankWorst !== null ? { leetcodeGlobalRankWorst: row.leetcodeGlobalRankWorst } : {}),
+      },
+    };
+  }
+  if (row.intentType === "PROJECT" || row.intentType === "HACKATHON") {
+    return {
+      intentType: row.intentType,
+      offer: {
+        roles: row.offeredRoles,
+        languages: row.offeredLanguages,
+        frameworks: row.offeredFrameworks,
+        domains: row.offeredDomains,
+      },
+      search: {
+        collaborationMode: row.collaborationMode ?? "EITHER",
+        requiredRoles: row.requiredRoles,
+        requiredLanguages: row.requiredLanguages,
+        requiredFrameworks: row.requiredFrameworks,
+        requiredDomains: row.requiredDomains,
+        niceToHaveRoles: row.niceToHaveRoles,
+        niceToHaveLanguages: row.niceToHaveLanguages,
+        niceToHaveFrameworks: row.niceToHaveFrameworks,
+        niceToHaveDomains: row.niceToHaveDomains,
+      },
+    };
+  }
   return {
-    intentType: intent.intentType,
-    ...(intent.ratingMin !== null ? { ratingMin: intent.ratingMin } : {}),
-    ...(intent.ratingMax !== null ? { ratingMax: intent.ratingMax } : {}),
-    preferredLanguages: intent.preferredLanguages,
-    preferredDomains: intent.preferredDomains,
+    intentType: "OPENSOURCE",
+    offer: {
+      languages: row.offeredLanguages,
+      frameworks: row.offeredFrameworks,
+      domains: row.offeredDomains,
+      repositoryTopics: row.offeredRepositoryTopics,
+      contributionTypes: row.offeredContributionTypes,
+    },
+    search: {
+      requiredLanguages: row.requiredLanguages,
+      requiredFrameworks: row.requiredFrameworks,
+      requiredDomains: row.requiredDomains,
+      requiredRepositoryTopics: row.requiredRepositoryTopics,
+      requiredContributionTypes: row.requiredContributionTypes,
+      niceToHaveLanguages: row.niceToHaveLanguages,
+      niceToHaveFrameworks: row.niceToHaveFrameworks,
+      niceToHaveDomains: row.niceToHaveDomains,
+      niceToHaveRepositoryTopics: row.niceToHaveRepositoryTopics,
+      niceToHaveContributionTypes: row.niceToHaveContributionTypes,
+    },
   };
+}
+
+function toConfiguration(
+  row: DbUser["intentConfigurations"][number],
+  verifiedCapabilities: VerifiedCapabilities,
+  githubUsable: boolean,
+): IntentConfiguration {
+  const input = rowToInput(row);
+  const evidence: CapabilityEvidence[] = [];
+  const addEvidence = (
+    category: CapabilityEvidence["category"],
+    selected: readonly string[],
+    verified: readonly string[],
+  ) => {
+    const verifiedSet = new Set(verified);
+    for (const value of selected) {
+      evidence.push({
+        category,
+        value,
+        source: verifiedSet.has(value) ? "VERIFIED" : "SELF_REPORTED",
+      });
+    }
+  };
+  if (input.intentType === "PROJECT" || input.intentType === "HACKATHON") {
+    evidence.push(...deriveRoleEvidence(input.offer.roles, verifiedCapabilities));
+  }
+  if (input.intentType !== "DSA") {
+    addEvidence("LANGUAGE", input.offer.languages, verifiedCapabilities.languages);
+    addEvidence("FRAMEWORK", input.offer.frameworks, verifiedCapabilities.frameworks);
+    addEvidence("DOMAIN", input.offer.domains, verifiedCapabilities.domains);
+    if (input.intentType === "OPENSOURCE") {
+      addEvidence("TOPIC", input.offer.repositoryTopics, verifiedCapabilities.repositoryTopics);
+    }
+  }
+  return {
+    ...input,
+    completeness: evaluateConfigurationCompleteness(input, {
+      githubUsable,
+      verifiedCapabilities,
+    }),
+    metadata: {
+      availableVerifiedCapabilities: verifiedCapabilities,
+      offerEvidence: evidence,
+    },
+    updatedAt: row.updatedAt.toISOString(),
+  } as IntentConfiguration;
 }
 
 function toMatchProfile(user: DbUser): MatchProfile | null {
   const profile = user.profile;
   if (!profile) return null;
-
-  const searchIntent = toIntentPreferences(user.searchIntent);
-  const openToIntents = [...new Set(user.openToIntents.map((intent) => intent.intentType as IntentType))];
-  const effectiveOpenToIntents = [...new Set([
-    ...openToIntents,
-    ...(searchIntent ? [searchIntent.intentType] : []),
-  ])];
-
-  if (
-    profile.profileScore < PROFILE_QUALITY_FLOOR ||
-    profile.skillVector.length !== SKILL_VECTOR_DIMENSIONS ||
-    profile.skillVector.every((value) => value === 0) ||
-    effectiveOpenToIntents.length === 0
-  ) {
-    return null;
-  }
 
   const calendar = parseContributionCalendar(profile.githubContributions);
   const githubSource = classifyCanonicalSkills([
@@ -82,6 +171,34 @@ function toMatchProfile(user: DbUser): MatchProfile | null {
   const lastSyncedAt = profile.githubLastSyncedAt?.toISOString() ?? null;
   const usable = connected && Boolean(lastSyncedAt) &&
     (githubSource.all.length > 0 || calendar.hasCalendar);
+  const verifiedCapabilities: VerifiedCapabilities = {
+    languages: githubSource.languages,
+    frameworks: githubSource.frameworks,
+    domains: githubSource.domains,
+    repositoryTopics: normalizeRepositoryTopics(profile.githubTopics),
+  };
+  const intentConfigurations = Object.fromEntries(
+    user.intentConfigurations.map((row) => [
+      row.intentType,
+      toConfiguration(row, verifiedCapabilities, usable),
+    ]),
+  ) as Partial<Record<IntentType, IntentConfiguration>>;
+  const searchIntent = user.searchIntent
+    ? intentConfigurations[user.searchIntent.intentType] ?? null
+    : null;
+  const openToIntents = [...new Set(user.openToIntents.map((intent) => intent.intentType as IntentType))];
+  const effectiveOpenToIntents = [...new Set([
+    ...openToIntents,
+    ...(user.searchIntent ? [user.searchIntent.intentType as IntentType] : []),
+  ])].filter((intentType) => intentConfigurations[intentType]?.completeness.offerComplete);
+
+  if (
+    profile.profileScore < PROFILE_QUALITY_FLOOR ||
+    profile.skillVector.length !== SKILL_VECTOR_DIMENSIONS ||
+    profile.skillVector.every((value) => value === 0)
+  ) {
+    return null;
+  }
 
   return {
     userId: user.id,
@@ -99,6 +216,7 @@ function toMatchProfile(user: DbUser): MatchProfile | null {
     profileScore: profile.profileScore,
     matchPreferencesRevision: user.matchPreferencesRevision,
     searchIntent,
+    intentConfigurations,
     openToIntents,
     effectiveOpenToIntents,
     github: {
@@ -119,6 +237,7 @@ function loadUsers(userId?: string) {
     include: {
       profile: true,
       searchIntent: true,
+      intentConfigurations: { orderBy: { intentType: "asc" } },
       openToIntents: {
         select: { intentType: true },
         orderBy: { intentType: "asc" },
@@ -189,8 +308,7 @@ export async function setSingleMatchProfile(profile: MatchProfile): Promise<void
     profile.profileScore >= PROFILE_QUALITY_FLOOR &&
     profile.vectorVersion === SKILL_VECTOR_VERSION &&
     profile.skillVector.length === SKILL_VECTOR_DIMENSIONS &&
-    !profile.skillVector.every((value) => value === 0) &&
-    profile.effectiveOpenToIntents.length > 0;
+    !profile.skillVector.every((value) => value === 0);
   if (!valid) {
     await redisClient.hdel(PROFILES_HASH, profile.userId);
     return;
@@ -198,20 +316,23 @@ export async function setSingleMatchProfile(profile: MatchProfile): Promise<void
   await redisClient.hset(PROFILES_HASH, profile.userId, JSON.stringify(profile));
 }
 
-export async function markAsSeen(actorId: string, targetId: string, intent: IntentType) {
-  const key = SEEN_KEY(actorId, intent);
-  const allKey = SEEN_KEY(actorId, "ALL");
-  await redisClient.sadd(key, targetId);
-  await redisClient.sadd(allKey, targetId);
-  await redisClient.expire(key, 7 * 24 * 60 * 60);
-  await redisClient.expire(allKey, 7 * 24 * 60 * 60);
+/** Global, symmetric seven-day rejection exclusion. Connections and pending
+ * requests are enforced durably through ConnectionPair; this Redis set is only
+ * the requested short-lived rejection cooldown. */
+export async function markRejectedGlobally(actorId: string, targetId: string) {
+  await Promise.all([
+    redisClient.sadd(GLOBAL_EXCLUSION_KEY(actorId), targetId),
+    redisClient.sadd(GLOBAL_EXCLUSION_KEY(targetId), actorId),
+    redisClient.expire(GLOBAL_EXCLUSION_KEY(actorId), 7 * 24 * 60 * 60),
+    redisClient.expire(GLOBAL_EXCLUSION_KEY(targetId), 7 * 24 * 60 * 60),
+  ]);
 }
 
-export async function getSeenIds(userId: string, intent: string): Promise<Set<string>> {
+export async function getGlobalExcludedIds(userId: string): Promise<Set<string>> {
   try {
-    return new Set(await redisClient.smembers(SEEN_KEY(userId, intent)));
+    return new Set(await redisClient.smembers(GLOBAL_EXCLUSION_KEY(userId)));
   } catch (error) {
-    console.error(`[Cache] Failed to fetch seen IDs for ${userId}`, error);
+    console.error(`[Cache] Failed to fetch global exclusions for ${userId}`, error);
     return new Set();
   }
 }

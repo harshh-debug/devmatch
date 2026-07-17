@@ -1,30 +1,32 @@
 import {
-  SKILL_LANGUAGE_INDICES,
-  SKILL_TECHNICAL_INDICES,
   SKILL_VECTOR_DIMENSIONS,
   SKILL_VECTOR_VERSION,
-  buildSkillVector,
-  classifyCanonicalSkills,
-  projectSkillVector,
+  countNiceToHaveMatches,
+  requiredGroupsMatch,
+  type CapabilityEvidence,
+  type CapabilityGroup,
+  type IntentConfiguration,
+  type NiceToHaveMatch,
+  type ResolvedMatchMode,
 } from "@devmatch/shared";
 import {
   getAllMatchProfiles,
   getMatchProfile,
-  getSeenIds,
+  getGlobalExcludedIds,
   reconstructMatchProfile,
 } from "../cache/vectorCache";
+import prismaClient from "db/client";
 import { calculateCosineSimilarity } from "./cosine";
 import type {
   CandidateResult,
+  ExploreCandidateResult,
   Compatibility,
   IntentType,
   LevelSource,
   MatchProfile,
-  MatchTier,
   RecommendationSnapshot,
 } from "./types";
 
-const TECHNICAL_FLOOR = 0.2;
 const PROFILE_QUALITY_FLOOR = 30;
 const compatibilityRank: Record<Compatibility, number> = {
   HIGH: 0,
@@ -43,7 +45,7 @@ export class MatchEngineError extends Error {
   }
 }
 
-function intersection(left: string[], right: string[]) {
+function intersection<T extends string>(left: readonly T[], right: readonly T[]): T[] {
   const rightSet = new Set(right);
   return [...new Set(left)].filter((value) => rightSet.has(value)).sort();
 }
@@ -63,7 +65,7 @@ function validProfile(profile: MatchProfile) {
 }
 
 function worseCompatibility(left: Compatibility, right: Compatibility): Compatibility {
-  return compatibilityRank[left]! >= compatibilityRank[right]! ? left : right;
+  return compatibilityRank[left] >= compatibilityRank[right] ? left : right;
 }
 
 function codeforcesCompatibility(left: number, right: number): Compatibility {
@@ -127,8 +129,7 @@ function githubExperienceTier(profile: MatchProfile): number | null {
     indicators.push(indicatorTier(profile.github.activeWeeksLastYear, [8, 26, 40]));
   }
   if (profile.github.stars !== null) {
-    const stars = profile.github.stars;
-    indicators.push(stars === 0 ? 0 : stars < 10 ? 1 : stars < 100 ? 2 : 3);
+    indicators.push(profile.github.stars === 0 ? 0 : profile.github.stars < 10 ? 1 : profile.github.stars < 100 ? 2 : 3);
   }
   if (indicators.length < 2) return null;
   indicators.sort((a, b) => a - b);
@@ -155,113 +156,353 @@ function githubCompatibility(
   };
 }
 
-function sourceFeatures(profile: MatchProfile, intentType: IntentType) {
-  if (intentType === "OPENSOURCE") {
-    return classifyCanonicalSkills([...profile.topLanguages, ...profile.github.topics]);
-  }
-  return classifyCanonicalSkills(profile.skillTags);
+function ratioScore(matched: number, total: number) {
+  return total === 0 ? 0 : Math.min(1, matched / total);
 }
 
-function technicalProjection(profile: MatchProfile, intentType: IntentType) {
-  if (intentType === "OPENSOURCE") {
-    const sourceVector = buildSkillVector({
-      skillTags: [...profile.topLanguages, ...profile.github.topics],
-    });
-    return projectSkillVector(sourceVector, SKILL_TECHNICAL_INDICES);
+function labeledFeatures(configuration: IntentConfiguration): string[] {
+  if (configuration.intentType === "DSA") {
+    return [
+      ...configuration.offer.languages.map((value) => `language:${value}`),
+      ...configuration.offer.goals.map((value) => `goal:${value}`),
+    ];
   }
-  return projectSkillVector(
-    profile.skillVector,
-    intentType === "DSA" ? SKILL_LANGUAGE_INDICES : SKILL_TECHNICAL_INDICES,
+  if (configuration.intentType === "PROJECT" || configuration.intentType === "HACKATHON") {
+    return [
+      ...configuration.offer.roles.map((value) => `role:${value}`),
+      ...configuration.offer.languages.map((value) => `language:${value}`),
+      ...configuration.offer.frameworks.map((value) => `framework:${value}`),
+      ...configuration.offer.domains.map((value) => `domain:${value}`),
+    ];
+  }
+  return [
+    ...configuration.offer.languages.map((value) => `language:${value}`),
+    ...configuration.offer.frameworks.map((value) => `framework:${value}`),
+    ...configuration.offer.domains.map((value) => `domain:${value}`),
+    ...configuration.offer.repositoryTopics.map((value) => `topic:${value}`),
+    ...configuration.offer.contributionTypes.map((value) => `contribution:${value}`),
+  ];
+}
+
+function overlapScore(left: readonly string[], right: readonly string[]) {
+  const union = new Set([...left, ...right]);
+  if (union.size === 0) return 0;
+  return intersection(left, right).length / union.size;
+}
+
+function matchingEvidence(
+  configuration: IntentConfiguration,
+  values: {
+    roles?: readonly string[];
+    languages?: readonly string[];
+    frameworks?: readonly string[];
+    domains?: readonly string[];
+    topics?: readonly string[];
+  },
+): CapabilityEvidence[] {
+  const selected = new Set([
+    ...(values.roles ?? []).map((value) => `ROLE:${value}`),
+    ...(values.languages ?? []).map((value) => `LANGUAGE:${value}`),
+    ...(values.frameworks ?? []).map((value) => `FRAMEWORK:${value}`),
+    ...(values.domains ?? []).map((value) => `DOMAIN:${value}`),
+    ...(values.topics ?? []).map((value) => `TOPIC:${value}`),
+  ]);
+  return configuration.metadata.offerEvidence.filter((evidence) =>
+    selected.has(`${evidence.category}:${evidence.value}`),
   );
 }
 
-function preferencesMatch(
-  requester: MatchProfile,
-  candidateFeatures: ReturnType<typeof sourceFeatures>,
+function providerMatches(
+  search: Extract<IntentConfiguration, { intentType: "DSA" }>["search"],
+  candidate: MatchProfile,
 ) {
-  const preferences = requester.searchIntent;
-  if (!preferences) return false;
-  const languageMatch = preferences.preferredLanguages.length === 0 ||
-    intersection(preferences.preferredLanguages, candidateFeatures.languages).length > 0;
-  const domainMatch = preferences.preferredDomains.length === 0 ||
-    intersection(preferences.preferredDomains, candidateFeatures.domains).length > 0;
-  return languageMatch && domainMatch;
+  const cfMatches = candidate.cfRating !== null &&
+    (search.codeforcesRatingMin === undefined || candidate.cfRating >= search.codeforcesRatingMin) &&
+    (search.codeforcesRatingMax === undefined || candidate.cfRating <= search.codeforcesRatingMax);
+  const lcMatches = candidate.lcRating !== null && candidate.lcRating > 0 &&
+    (search.leetcodeGlobalRankBest === undefined || candidate.lcRating >= search.leetcodeGlobalRankBest) &&
+    (search.leetcodeGlobalRankWorst === undefined || candidate.lcRating <= search.leetcodeGlobalRankWorst);
+  if (search.providerPreference === "CODEFORCES") return cfMatches;
+  if (search.providerPreference === "LEETCODE") return lcMatches;
+  return cfMatches || lcMatches;
+}
+
+function evaluateDsa(
+  requester: MatchProfile,
+  candidate: MatchProfile,
+  requesterConfiguration: Extract<IntentConfiguration, { intentType: "DSA" }>,
+  candidateConfiguration: Extract<IntentConfiguration, { intentType: "DSA" }>,
+): RecommendationSnapshot | null {
+  const search = requesterConfiguration.search;
+  if (!providerMatches(search, candidate)) return null;
+  const groups: CapabilityGroup[] = [
+    { required: search.requiredLanguages, offered: candidateConfiguration.offer.languages },
+    { required: search.requiredGoals, offered: candidateConfiguration.offer.goals },
+  ];
+  if (!requiredGroupsMatch(groups)) return null;
+  const matchedLanguages = intersection(search.requiredLanguages, candidateConfiguration.offer.languages);
+  const matchedGoals = intersection(search.requiredGoals, candidateConfiguration.offer.goals);
+  const niceToHave = countNiceToHaveMatches([
+    { required: search.niceToHaveLanguages, offered: candidateConfiguration.offer.languages },
+    { required: search.niceToHaveGoals, offered: candidateConfiguration.offer.goals },
+  ]);
+  const totalRequired = search.requiredLanguages.length + search.requiredGoals.length;
+  const technicalFitScore = ratioScore(matchedLanguages.length + matchedGoals.length, totalRequired);
+  const level = dsaCompatibility(requester, candidate);
+  const reasonCodes = ["DSA_REQUIRED_CAPABILITIES_MATCHED"];
+  return snapshot({
+    intentType: "DSA",
+    technicalFitScore,
+    level,
+    resolvedMatchMode: "DIRECT",
+    matchedLanguages,
+    matchedGoals,
+    niceToHave,
+    reasonCodes,
+  });
+}
+
+function buildGroups(
+  search: Extract<IntentConfiguration, { intentType: "PROJECT" | "HACKATHON" }>["search"],
+  candidateConfiguration: Extract<IntentConfiguration, { intentType: "PROJECT" | "HACKATHON" }>,
+) {
+  return [
+    { required: search.requiredRoles, offered: candidateConfiguration.offer.roles },
+    { required: search.requiredLanguages, offered: candidateConfiguration.offer.languages },
+    { required: search.requiredFrameworks, offered: candidateConfiguration.offer.frameworks },
+    { required: search.requiredDomains, offered: candidateConfiguration.offer.domains },
+  ] satisfies CapabilityGroup[];
+}
+
+function evaluateBuild(
+  requester: MatchProfile,
+  candidate: MatchProfile,
+  requesterConfiguration: Extract<IntentConfiguration, { intentType: "PROJECT" | "HACKATHON" }>,
+  candidateConfiguration: Extract<IntentConfiguration, { intentType: "PROJECT" | "HACKATHON" }>,
+): RecommendationSnapshot | null {
+  const search = requesterConfiguration.search;
+  if (!requiredGroupsMatch(buildGroups(search, candidateConfiguration))) return null;
+  const matchedRoles = intersection(search.requiredRoles, candidateConfiguration.offer.roles);
+  const matchedLanguages = intersection(search.requiredLanguages, candidateConfiguration.offer.languages);
+  const matchedFrameworks = intersection(search.requiredFrameworks, candidateConfiguration.offer.frameworks);
+  const matchedDomains = intersection(search.requiredDomains, candidateConfiguration.offer.domains);
+  const matchedCount = matchedRoles.length + matchedLanguages.length + matchedFrameworks.length + matchedDomains.length;
+  const requiredCount = search.requiredRoles.length + search.requiredLanguages.length +
+    search.requiredFrameworks.length + search.requiredDomains.length;
+  const complementaryFit = ratioScore(matchedCount, requiredCount);
+  const similarFit = overlapScore(
+    labeledFeatures(requesterConfiguration),
+    labeledFeatures(candidateConfiguration),
+  );
+  const fillsMissing = [
+    ...matchedRoles.map((value) => `role:${value}`),
+    ...matchedLanguages.map((value) => `language:${value}`),
+    ...matchedFrameworks.map((value) => `framework:${value}`),
+    ...matchedDomains.map((value) => `domain:${value}`),
+  ].some((value) => !labeledFeatures(requesterConfiguration).includes(value));
+
+  let resolvedMatchMode: ResolvedMatchMode;
+  let technicalFitScore: number;
+  if (search.collaborationMode === "SIMILAR") {
+    if (similarFit <= 0) return null;
+    resolvedMatchMode = "SIMILAR";
+    technicalFitScore = similarFit;
+  } else if (search.collaborationMode === "COMPLEMENTARY") {
+    resolvedMatchMode = "COMPLEMENTARY";
+    technicalFitScore = complementaryFit;
+  } else if (complementaryFit > similarFit || (complementaryFit === similarFit && fillsMissing)) {
+    resolvedMatchMode = "COMPLEMENTARY";
+    technicalFitScore = complementaryFit;
+  } else {
+    if (similarFit <= 0) return null;
+    resolvedMatchMode = "SIMILAR";
+    technicalFitScore = similarFit;
+  }
+
+  const niceToHave = countNiceToHaveMatches([
+    { required: search.niceToHaveRoles, offered: candidateConfiguration.offer.roles },
+    { required: search.niceToHaveLanguages, offered: candidateConfiguration.offer.languages },
+    { required: search.niceToHaveFrameworks, offered: candidateConfiguration.offer.frameworks },
+    { required: search.niceToHaveDomains, offered: candidateConfiguration.offer.domains },
+  ]);
+  const level = githubCompatibility(requester, candidate);
+  const reasonCodes = [
+    resolvedMatchMode === "SIMILAR" ? "SIMILAR_OFFER_OVERLAP" : "COMPLEMENTARY_REQUIREMENTS_FILLED",
+  ];
+  return snapshot({
+    intentType: requesterConfiguration.intentType,
+    technicalFitScore,
+    level,
+    resolvedMatchMode,
+    matchedRoles,
+    matchedLanguages,
+    matchedFrameworks,
+    matchedDomains,
+    niceToHave,
+    reasonCodes,
+    capabilityEvidence: matchingEvidence(candidateConfiguration, {
+      roles: matchedRoles,
+      languages: matchedLanguages,
+      frameworks: matchedFrameworks,
+      domains: matchedDomains,
+    }),
+  });
+}
+
+function evaluateOpenSource(
+  requester: MatchProfile,
+  candidate: MatchProfile,
+  requesterConfiguration: Extract<IntentConfiguration, { intentType: "OPENSOURCE" }>,
+  candidateConfiguration: Extract<IntentConfiguration, { intentType: "OPENSOURCE" }>,
+): RecommendationSnapshot | null {
+  if (!requester.github.usable || !candidate.github.usable) return null;
+  const search = requesterConfiguration.search;
+  const groups: CapabilityGroup[] = [
+    { required: search.requiredLanguages, offered: candidateConfiguration.offer.languages },
+    { required: search.requiredFrameworks, offered: candidateConfiguration.offer.frameworks },
+    { required: search.requiredDomains, offered: candidateConfiguration.offer.domains },
+    { required: search.requiredRepositoryTopics, offered: candidateConfiguration.offer.repositoryTopics },
+    { required: search.requiredContributionTypes, offered: candidateConfiguration.offer.contributionTypes },
+  ];
+  if (!requiredGroupsMatch(groups)) return null;
+  const matchedLanguages = intersection(search.requiredLanguages, candidateConfiguration.offer.languages);
+  const matchedFrameworks = intersection(search.requiredFrameworks, candidateConfiguration.offer.frameworks);
+  const matchedDomains = intersection(search.requiredDomains, candidateConfiguration.offer.domains);
+  const matchedRepositoryTopics = intersection(search.requiredRepositoryTopics, candidateConfiguration.offer.repositoryTopics);
+  const matchedContributionTypes = intersection(search.requiredContributionTypes, candidateConfiguration.offer.contributionTypes);
+  const matchedCount = matchedLanguages.length + matchedFrameworks.length + matchedDomains.length +
+    matchedRepositoryTopics.length + matchedContributionTypes.length;
+  const requiredCount = search.requiredLanguages.length + search.requiredFrameworks.length +
+    search.requiredDomains.length + search.requiredRepositoryTopics.length +
+    search.requiredContributionTypes.length;
+  const niceToHave = countNiceToHaveMatches([
+    { required: search.niceToHaveLanguages, offered: candidateConfiguration.offer.languages },
+    { required: search.niceToHaveFrameworks, offered: candidateConfiguration.offer.frameworks },
+    { required: search.niceToHaveDomains, offered: candidateConfiguration.offer.domains },
+    { required: search.niceToHaveRepositoryTopics, offered: candidateConfiguration.offer.repositoryTopics },
+    { required: search.niceToHaveContributionTypes, offered: candidateConfiguration.offer.contributionTypes },
+  ]);
+  return snapshot({
+    intentType: "OPENSOURCE",
+    technicalFitScore: ratioScore(matchedCount, requiredCount),
+    level: githubCompatibility(requester, candidate),
+    resolvedMatchMode: "DIRECT",
+    matchedLanguages,
+    matchedFrameworks,
+    matchedDomains,
+    matchedRepositoryTopics,
+    matchedContributionTypes,
+    niceToHave,
+    reasonCodes: ["GITHUB_VERIFIED_REQUIREMENTS_MATCHED"],
+    capabilityEvidence: matchingEvidence(candidateConfiguration, {
+      languages: matchedLanguages,
+      frameworks: matchedFrameworks,
+      domains: matchedDomains,
+      topics: matchedRepositoryTopics,
+    }),
+  });
+}
+
+function snapshot(input: {
+  intentType: IntentType;
+  technicalFitScore: number;
+  level: { compatibility: Compatibility; levelSource: LevelSource };
+  resolvedMatchMode: ResolvedMatchMode;
+  matchedLanguages?: string[];
+  matchedFrameworks?: string[];
+  matchedDomains?: string[];
+  matchedRoles?: RecommendationSnapshot["matchedRoles"];
+  matchedGoals?: RecommendationSnapshot["matchedGoals"];
+  matchedContributionTypes?: RecommendationSnapshot["matchedContributionTypes"];
+  matchedRepositoryTopics?: string[];
+  niceToHave: NiceToHaveMatch;
+  reasonCodes: string[];
+  capabilityEvidence?: CapabilityEvidence[];
+}): RecommendationSnapshot {
+  const matchedLanguages = input.matchedLanguages ?? [];
+  const matchedFrameworks = input.matchedFrameworks ?? [];
+  const matchedDomains = input.matchedDomains ?? [];
+  const matchedRoles = input.matchedRoles ?? [];
+  const matchedGoals = input.matchedGoals ?? [];
+  const matchedContributionTypes = input.matchedContributionTypes ?? [];
+  const matchedRepositoryTopics = input.matchedRepositoryTopics ?? [];
+  const matchedSkills = [...new Set([
+    ...matchedLanguages,
+    ...matchedFrameworks,
+    ...matchedDomains,
+    ...matchedRepositoryTopics,
+  ])].sort();
+  return {
+    similarityScore: input.technicalFitScore,
+    technicalFitScore: input.technicalFitScore,
+    compatibility: input.level.compatibility,
+    levelSource: input.level.levelSource,
+    resolvedMatchMode: input.resolvedMatchMode,
+    matchedSkills,
+    matchedLanguages,
+    matchedFrameworks,
+    matchedDomains,
+    matchedRoles,
+    matchedGoals,
+    matchedContributionTypes,
+    matchedRepositoryTopics,
+    niceToHave: input.niceToHave,
+    capabilityEvidence: input.capabilityEvidence ?? [],
+    reasonCodes: input.reasonCodes,
+    explanation: {
+      intentType: input.intentType,
+      compatibility: input.level.compatibility,
+      levelSource: input.level.levelSource,
+      resolvedMatchMode: input.resolvedMatchMode,
+      reasonCodes: input.reasonCodes,
+      capabilityEvidence: input.capabilityEvidence ?? [],
+    },
+  };
 }
 
 export function evaluateRecommendation(
   requester: MatchProfile,
   candidate: MatchProfile,
   intentType: IntentType,
-): { snapshot: RecommendationSnapshot; preferencesMatched: boolean } | null {
+): { snapshot: RecommendationSnapshot } | null {
   if (!validProfile(requester) || !validProfile(candidate)) return null;
   if (!candidate.effectiveOpenToIntents.includes(intentType)) return null;
   if (candidate.availability === "BUSY") return null;
-  if (intentType === "OPENSOURCE" && (!requester.github.usable || !candidate.github.usable)) {
+  const requesterConfiguration = requester.intentConfigurations[intentType];
+  const candidateConfiguration = candidate.intentConfigurations[intentType];
+  if (
+    !requesterConfiguration?.completeness.offerComplete ||
+    !requesterConfiguration.completeness.searchComplete ||
+    !candidateConfiguration?.completeness.offerComplete
+  ) {
     return null;
   }
-
-  const requesterFeatures = sourceFeatures(requester, intentType);
-  const candidateFeatures = sourceFeatures(candidate, intentType);
-  const matchedLanguages = intersection(requesterFeatures.languages, candidateFeatures.languages);
-  const matchedDomains = intentType === "DSA"
-    ? []
-    : intersection(requesterFeatures.domains, candidateFeatures.domains);
-  const matchedFrameworks = intentType === "DSA"
-    ? []
-    : intersection(requesterFeatures.frameworks, candidateFeatures.frameworks);
-  const matchedSkills = [...new Set([
-    ...matchedLanguages,
-    ...matchedFrameworks,
-    ...matchedDomains,
-  ])].sort();
-  if (matchedSkills.length === 0) return null;
-
-  const similarityScore = calculateCosineSimilarity(
-    technicalProjection(requester, intentType),
-    technicalProjection(candidate, intentType),
-  );
-  if (!Number.isFinite(similarityScore) || similarityScore < TECHNICAL_FLOOR) return null;
-
-  const preferences = requester.searchIntent;
-  if (
-    intentType === "DSA" &&
-    preferences &&
-    (preferences.ratingMin !== undefined || preferences.ratingMax !== undefined)
+  let evaluated: RecommendationSnapshot | null;
+  if (intentType === "DSA" && requesterConfiguration.intentType === "DSA" && candidateConfiguration.intentType === "DSA") {
+    evaluated = evaluateDsa(requester, candidate, requesterConfiguration, candidateConfiguration);
+  } else if (
+    (intentType === "PROJECT" || intentType === "HACKATHON") &&
+    requesterConfiguration.intentType === intentType &&
+    candidateConfiguration.intentType === intentType
   ) {
-    if (candidate.cfRating === null) return null;
-    if (preferences.ratingMin !== undefined && candidate.cfRating < preferences.ratingMin) return null;
-    if (preferences.ratingMax !== undefined && candidate.cfRating > preferences.ratingMax) return null;
+    evaluated = evaluateBuild(requester, candidate, requesterConfiguration, candidateConfiguration);
+  } else if (
+    intentType === "OPENSOURCE" &&
+    requesterConfiguration.intentType === "OPENSOURCE" &&
+    candidateConfiguration.intentType === "OPENSOURCE"
+  ) {
+    evaluated = evaluateOpenSource(requester, candidate, requesterConfiguration, candidateConfiguration);
+  } else {
+    evaluated = null;
   }
-
-  const level = intentType === "DSA"
-    ? dsaCompatibility(requester, candidate)
-    : githubCompatibility(requester, candidate);
-  const preferencesMatched = preferencesMatch(requester, candidateFeatures);
-  const matchTier: MatchTier = preferencesMatched ? "STRICT" : "RELAXED_PREFERENCES";
-
-  return {
-    preferencesMatched,
-    snapshot: {
-      similarityScore,
-      compatibility: level.compatibility,
-      levelSource: level.levelSource,
-      matchedSkills,
-      matchedLanguages,
-      matchedDomains,
-      matchTier,
-      explanation: {
-        intentType,
-        compatibility: level.compatibility,
-        levelSource: level.levelSource,
-        matchTier,
-      },
-    },
-  };
+  return evaluated ? { snapshot: evaluated } : null;
 }
 
 export function compareCandidateResults(left: CandidateResult, right: CandidateResult) {
-  return compatibilityRank[left.compatibility]! - compatibilityRank[right.compatibility]! ||
-    right.similarityScore - left.similarityScore ||
+  return compatibilityRank[left.compatibility] - compatibilityRank[right.compatibility] ||
+    right.niceToHave.matchedGroupCount - left.niceToHave.matchedGroupCount ||
+    right.niceToHave.matchedValueCount - left.niceToHave.matchedValueCount ||
+    right.technicalFitScore - left.technicalFitScore ||
     right.profileScore - left.profileScore ||
     left.userId.localeCompare(right.userId);
 }
@@ -278,14 +519,101 @@ async function authoritativeRequester(requesterId: string, intentRevision?: numb
   if (!requester?.searchIntent) {
     throw new MatchEngineError(409, "SEARCH_INTENT_REQUIRED", "Set a search intent before discovering candidates.");
   }
+  if (
+    !requester.searchIntent.completeness.offerComplete ||
+    !requester.searchIntent.completeness.searchComplete
+  ) {
+    throw new MatchEngineError(
+      409,
+      "INTENT_CONFIGURATION_REQUIRED",
+      "Complete the active intent configuration before discovering candidates.",
+    );
+  }
   return requester;
 }
 
 export interface RankerResponse {
   candidates: CandidateResult[];
-  relaxedStartIndex?: number;
-  relaxed: boolean;
   totalAvailable: number;
+}
+
+export interface ExploreRankerResponse {
+  candidates: ExploreCandidateResult[];
+  totalAvailable: number;
+}
+
+async function pairExcludedIds(userId: string) {
+  const pairs = await prismaClient.connectionPair.findMany({
+    where: {
+      status: { in: ["PENDING", "MATCHED"] },
+      OR: [{ userAId: userId }, { userBId: userId }],
+    },
+    select: { userAId: true, userBId: true },
+  });
+  return new Set(pairs.map((pair) => pair.userAId === userId ? pair.userBId : pair.userAId));
+}
+
+function generalExperienceProximity(
+  requester: MatchProfile,
+  candidate: MatchProfile,
+): Pick<ExploreCandidateResult, "experienceProximity" | "experienceSource"> {
+  if (requester.cfRating !== null && candidate.cfRating !== null) {
+    return { experienceProximity: Math.max(0, 1 - Math.abs(requester.cfRating - candidate.cfRating) / 2_000), experienceSource: "CODEFORCES" };
+  }
+  if (requester.lcRating !== null && candidate.lcRating !== null && requester.lcRating > 0 && candidate.lcRating > 0) {
+    return { experienceProximity: Math.max(0, 1 - Math.abs(requester.lcRating - candidate.lcRating) / Math.max(requester.lcRating, candidate.lcRating)), experienceSource: "LEETCODE" };
+  }
+  const requestTier = githubExperienceTier(requester);
+  const candidateTier = githubExperienceTier(candidate);
+  if (requester.github.usable && candidate.github.usable && requestTier !== null && candidateTier !== null) {
+    return { experienceProximity: Math.max(0, 1 - Math.abs(requestTier - candidateTier) / 3), experienceSource: "GITHUB" };
+  }
+  return { experienceProximity: 0, experienceSource: "UNKNOWN" };
+}
+
+export function compareExploreCandidates(left: ExploreCandidateResult, right: ExploreCandidateResult) {
+  return right.similarityScore - left.similarityScore ||
+    right.sharedSkillCount - left.sharedSkillCount ||
+    right.experienceProximity - left.experienceProximity ||
+    right.profileScore - left.profileScore ||
+    left.userId.localeCompare(right.userId);
+}
+
+export async function getExploreCandidates(
+  requesterId: string,
+  page = 1,
+  limit = 20,
+): Promise<ExploreRankerResponse> {
+  const requester = await getMatchProfile(requesterId) ?? await reconstructMatchProfile(requesterId);
+  if (!requester || !validProfile(requester) || requester.availability === "BUSY") {
+    throw new MatchEngineError(409, "PROFILE_CONFIGURATION_REQUIRED", "Complete your profile before exploring developers.");
+  }
+  const [allProfiles, globalRejected, pairExcluded] = await Promise.all([
+    getAllMatchProfiles(),
+    getGlobalExcludedIds(requesterId),
+    pairExcludedIds(requesterId),
+  ]);
+  const candidates: ExploreCandidateResult[] = [];
+  for (const candidate of allProfiles) {
+    if (
+      candidate.userId === requesterId ||
+      candidate.availability === "BUSY" ||
+      globalRejected.has(candidate.userId) ||
+      pairExcluded.has(candidate.userId) ||
+      !validProfile(candidate)
+    ) continue;
+    const sharedSkills = intersection(requester.skillTags, candidate.skillTags);
+    candidates.push({
+      ...candidate,
+      similarityScore: calculateCosineSimilarity(requester.skillVector, candidate.skillVector),
+      sharedSkills,
+      sharedSkillCount: sharedSkills.length,
+      ...generalExperienceProximity(requester, candidate),
+    });
+  }
+  candidates.sort(compareExploreCandidates);
+  const start = (page - 1) * limit;
+  return { candidates: candidates.slice(start, start + limit), totalAvailable: candidates.length };
 }
 
 async function rankCandidates(
@@ -293,40 +621,33 @@ async function rankCandidates(
   page: number,
   limit: number,
   intentRevision: number | undefined,
-  explore: boolean,
 ): Promise<RankerResponse> {
   const requester = await authoritativeRequester(requesterId, intentRevision);
   const intentType = requester.searchIntent!.intentType;
-  const [allProfiles, seenIds] = await Promise.all([
+  const [allProfiles, globallyRejected, pairExcluded] = await Promise.all([
     getAllMatchProfiles(),
-    getSeenIds(requesterId, intentType),
+    getGlobalExcludedIds(requesterId),
+    pairExcludedIds(requesterId),
   ]);
-
-  const strict: CandidateResult[] = [];
-  const relaxed: CandidateResult[] = [];
+  const ordered: CandidateResult[] = [];
   for (const candidate of allProfiles) {
-    if (candidate.userId === requesterId || seenIds.has(candidate.userId)) continue;
+    if (
+      candidate.userId === requesterId ||
+      globallyRejected.has(candidate.userId) ||
+      pairExcluded.has(candidate.userId)
+    ) continue;
     const evaluated = evaluateRecommendation(requester, candidate, intentType);
     if (!evaluated) continue;
-    const result: CandidateResult = {
+    ordered.push({
       ...candidate,
       ...evaluated.snapshot,
       levelBand: levelBand(evaluated.snapshot.compatibility),
-    };
-    if (evaluated.preferencesMatched) strict.push(result);
-    else relaxed.push(result);
+    });
   }
-  strict.sort(compareCandidateResults);
-  relaxed.sort(compareCandidateResults);
-
-  const ordered = explore
-    ? [...strict, ...relaxed].sort(compareCandidateResults)
-    : [...strict, ...relaxed];
+  ordered.sort(compareCandidateResults);
   const start = (page - 1) * limit;
   return {
     candidates: ordered.slice(start, start + limit),
-    relaxed: relaxed.length > 0,
-    relaxedStartIndex: strict.length,
     totalAvailable: ordered.length,
   };
 }
@@ -337,7 +658,7 @@ export function getRankedCandidates(
   limit = 20,
   intentRevision?: number,
 ) {
-  return rankCandidates(requesterId, page, limit, intentRevision, false);
+  return rankCandidates(requesterId, page, limit, intentRevision);
 }
 
 export function getSimilarCandidates(
@@ -346,5 +667,5 @@ export function getSimilarCandidates(
   limit = 20,
   intentRevision?: number,
 ) {
-  return rankCandidates(requesterId, page, limit, intentRevision, true);
+  return rankCandidates(requesterId, page, limit, intentRevision);
 }

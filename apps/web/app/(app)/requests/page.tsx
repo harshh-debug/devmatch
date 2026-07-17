@@ -15,19 +15,19 @@ export default function RequestsPage() {
   });
 
   const actionMutation = useMutation({
-    mutationFn: ({ targetId, action, intentType }: { targetId: string; action: "ACCEPTED" | "REJECTED"; intentType: string }) =>
+    mutationFn: ({ targetId, action, connectionContext }: { targetId: string; action: "ACCEPTED" | "REJECTED"; connectionContext: string }) =>
       apiFetch("/match/action", {
         token,
         method: "POST",
-        body: { targetId, action, intentType },
+        body: { targetId, action, connectionContext },
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["match", "requests"] });
     },
   });
 
-  const handleAction = (id: string, action: "ACCEPTED" | "REJECTED", intentType: string) => {
-    actionMutation.mutate({ targetId: id, action, intentType });
+  const handleAction = (id: string, action: "ACCEPTED" | "REJECTED", connectionContext: string) => {
+    actionMutation.mutate({ targetId: id, action, connectionContext });
   };
 
 

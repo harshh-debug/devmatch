@@ -30,13 +30,6 @@ declare module "next-auth" {
   }
 }
 
-/** Fields we stash on the JWT (it already has a string index signature). */
-type TokenClaims = {
-  accessToken?: string;
-  username?: string;
-  onboardingComplete?: boolean;
-};
-
 interface BackendAuthResponse {
   token: string;
   user: { id: string; email: string; username: string };
@@ -45,6 +38,7 @@ interface BackendAuthResponse {
 /** Minimal profile shape — only fields needed for onboarding gate. */
 interface MeResponse {
   intentType?: string;
+  matchingOnboardingComplete?: boolean;
 }
 
 const PROTECTED_PREFIXES = [
@@ -84,7 +78,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           let onboardingComplete = false;
           try {
             const me = await apiFetch<MeResponse>("/users/me", { token: data.token });
-            onboardingComplete = !!me?.intentType;
+            onboardingComplete = me?.matchingOnboardingComplete ?? !!me?.intentType;
           } catch {
             // If /users/me fails, conservatively assume onboarding not done.
           }
@@ -120,7 +114,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           // Check if the user has already completed onboarding.
           try {
             const me = await apiFetch<MeResponse>("/users/me", { token: data.token });
-            user.onboardingComplete = !!me?.intentType;
+            user.onboardingComplete = me?.matchingOnboardingComplete ?? !!me?.intentType;
           } catch {
             user.onboardingComplete = false;
           }
@@ -149,20 +143,17 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      const s = session as any;
-      s.accessToken = token.accessToken ?? "";
-      if (s.user) {
-        s.user.id = token.sub ?? "";
-        s.user.username = token.username ?? "";
-        s.user.onboardingComplete = token.onboardingComplete ?? false;
+      session.accessToken = typeof token.accessToken === "string" ? token.accessToken : "";
+      if (session.user) {
+        session.user.id = token.sub ?? "";
+        session.user.username = typeof token.username === "string" ? token.username : "";
+        session.user.onboardingComplete = token.onboardingComplete === true;
       }
-      return s;
+      return session;
     },
     authorized({ request, auth }) {
-      const session = auth as any;
       const path = request.nextUrl.pathname;
-      const isLoggedIn = !!session?.user;
-      const onboardingComplete = session?.user?.onboardingComplete ?? false;
+      const isLoggedIn = !!auth?.user;
       const isAuthRoute = path === "/login" || path === "/signup";
 
       // Unauthenticated → force login for protected routes.

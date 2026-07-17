@@ -1,14 +1,83 @@
 import { describe, expect, it } from "bun:test";
-import { buildSkillVector, SKILL_VECTOR_VERSION } from "@devmatch/shared";
 import {
-  compareCandidateResults,
-  evaluateRecommendation,
-} from "./ranker";
-import type { CandidateResult, MatchProfile } from "./types";
+  SKILL_VECTOR_VERSION,
+  buildSkillVector,
+  type IntentConfiguration,
+} from "@devmatch/shared";
+import { compareCandidateResults, compareExploreCandidates, evaluateRecommendation } from "./ranker";
+import type { CandidateResult, ExploreCandidateResult, MatchProfile, RecommendationSnapshot } from "./types";
+
+const metadata = {
+  availableVerifiedCapabilities: {
+    languages: [],
+    frameworks: [],
+    domains: [],
+    repositoryTopics: [],
+  },
+  offerEvidence: [],
+};
+
+function complete<T extends Omit<IntentConfiguration, "completeness" | "metadata" | "updatedAt">>(
+  input: T,
+): IntentConfiguration {
+  return {
+    ...input,
+    completeness: {
+      offerComplete: true,
+      searchComplete: true,
+      offerIssues: [],
+      searchIssues: [],
+    },
+    metadata,
+    updatedAt: "2026-07-17T00:00:00.000Z",
+  } as IntentConfiguration;
+}
+
+function dsa(languages = ["python"], goals: ("INTERVIEW_PREP" | "COMPETITIVE_PROGRAMMING")[] = ["INTERVIEW_PREP"]) {
+  return complete({
+    intentType: "DSA",
+    offer: { languages, goals },
+    search: {
+      requiredLanguages: languages,
+      requiredGoals: goals,
+      niceToHaveLanguages: [],
+      niceToHaveGoals: [],
+      providerPreference: "EITHER",
+    },
+  });
+}
+
+function project(
+  role: "FRONTEND" | "ML_AI",
+  language: string,
+  mode: "SIMILAR" | "COMPLEMENTARY" | "EITHER" = "SIMILAR",
+) {
+  return complete({
+    intentType: "PROJECT",
+    offer: {
+      roles: [role],
+      languages: [language],
+      frameworks: role === "FRONTEND" ? ["react"] : [],
+      domains: role === "ML_AI" ? ["ml"] : ["web"],
+    },
+    search: {
+      collaborationMode: mode,
+      requiredRoles: mode === "COMPLEMENTARY" ? ["ML_AI"] : [role],
+      requiredLanguages: mode === "COMPLEMENTARY" ? ["python"] : [language],
+      requiredFrameworks: [],
+      requiredDomains: [],
+      niceToHaveRoles: [],
+      niceToHaveLanguages: [],
+      niceToHaveFrameworks: [],
+      niceToHaveDomains: [],
+    },
+  });
+}
 
 function profile(
   userId: string,
-  options: Partial<MatchProfile> & { skills: string[] },
+  configuration: IntentConfiguration,
+  options: Partial<MatchProfile> = {},
 ): MatchProfile {
   return {
     userId,
@@ -16,22 +85,19 @@ function profile(
     displayName: userId,
     avatarUrl: null,
     college: null,
-    skillTags: options.skills,
+    skillTags: ["typescript"],
     topLanguages: [],
-    lcRating: null,
-    cfRating: null,
-    skillVector: buildSkillVector({ skillTags: options.skills }),
+    lcRating: 10000,
+    cfRating: 1500,
+    skillVector: buildSkillVector({ skillTags: ["typescript"] }),
     vectorVersion: SKILL_VECTOR_VERSION,
     availability: "ACTIVE",
     profileScore: 80,
     matchPreferencesRevision: 1,
-    searchIntent: {
-      intentType: "DSA",
-      preferredLanguages: [],
-      preferredDomains: [],
-    },
+    searchIntent: configuration,
+    intentConfigurations: { [configuration.intentType]: configuration },
     openToIntents: [],
-    effectiveOpenToIntents: ["DSA"],
+    effectiveOpenToIntents: [configuration.intentType],
     github: {
       connected: false,
       usable: false,
@@ -46,154 +112,132 @@ function profile(
 }
 
 describe("intent-specific matching", () => {
-  it("requires shared DSA languages and applies Codeforces compatibility thresholds", () => {
-    const requester = profile("requester", { skills: ["python", "typescript"], cfRating: 1500 });
-    const near = profile("near", { skills: ["python"], cfRating: 1700 });
-    const far = profile("far", { skills: ["python", "typescript"], cfRating: 2200 });
+  it("uses DSA offer languages and goals rather than general profile skills", () => {
+    const requester = profile("requester", dsa(["cpp"]));
+    const candidate = profile("candidate", dsa(["cpp"]), {
+      skillTags: ["typescript"],
+      skillVector: buildSkillVector({ skillTags: ["typescript"] }),
+    });
+    const wrongGoal = profile("wrong-goal", dsa(["cpp"], ["COMPETITIVE_PROGRAMMING"]));
 
-    expect(evaluateRecommendation(requester, near, "DSA")?.snapshot.compatibility).toBe("HIGH");
-    expect(evaluateRecommendation(requester, far, "DSA")?.snapshot.compatibility).toBe("LOW");
-    expect(evaluateRecommendation(requester, profile("none", { skills: ["java"] }), "DSA")).toBeNull();
+    expect(evaluateRecommendation(requester, candidate, "DSA")?.snapshot.matchedLanguages)
+      .toEqual(["cpp"]);
+    expect(evaluateRecommendation(requester, wrongGoal, "DSA")).toBeNull();
   });
 
-  it("keeps manual Project matching with unknown compatibility but rejects unusable Open Source", () => {
-    const requester = profile("requester", {
-      skills: ["typescript", "react", "web"],
-      searchIntent: {
-        intentType: "PROJECT",
-        preferredLanguages: [],
-        preferredDomains: [],
-      },
-    });
-    const candidate = profile("candidate", {
-      skills: ["typescript", "react", "web"],
-      effectiveOpenToIntents: ["PROJECT", "OPENSOURCE"],
-    });
+  it("applies inclusive provider ranges", () => {
+    const configuration = dsa(["python"]);
+    if (configuration.intentType !== "DSA") throw new Error("fixture");
+    configuration.search.providerPreference = "CODEFORCES";
+    configuration.search.codeforcesRatingMin = 1400;
+    configuration.search.codeforcesRatingMax = 1600;
+    const requester = profile("requester", configuration);
 
-    expect(evaluateRecommendation(requester, candidate, "PROJECT")?.snapshot.compatibility).toBe("UNKNOWN");
-    expect(evaluateRecommendation(requester, candidate, "OPENSOURCE")).toBeNull();
+    expect(evaluateRecommendation(requester, profile("edge", dsa(), { cfRating: 1600 }), "DSA"))
+      .not.toBeNull();
+    expect(evaluateRecommendation(requester, profile("outside", dsa(), { cfRating: 1601 }), "DSA"))
+      .toBeNull();
   });
 
-  it("keeps a passive candidate eligible through explicit inbound intents", () => {
-    const requester = profile("requester", { skills: ["python"], cfRating: 1500 });
-    const passiveCandidate = profile("passive", {
-      skills: ["python"],
-      cfRating: 1600,
-      searchIntent: null,
-      openToIntents: ["DSA"],
-      effectiveOpenToIntents: ["DSA"],
-    });
+  it("supports complementary Project matching without requester overlap", () => {
+    const requester = profile("requester", project("FRONTEND", "typescript", "COMPLEMENTARY"));
+    const candidate = profile("candidate", project("ML_AI", "python"));
+    candidate.effectiveOpenToIntents = ["PROJECT"];
 
-    expect(evaluateRecommendation(requester, passiveCandidate, "DSA")?.snapshot.compatibility)
-      .toBe("HIGH");
+    expect(evaluateRecommendation(requester, candidate, "PROJECT")?.snapshot)
+      .toMatchObject({
+        resolvedMatchMode: "COMPLEMENTARY",
+        matchedRoles: ["ML_AI"],
+        matchedLanguages: ["python"],
+      });
   });
 
-  it("uses the worse shared CP provider and returns unknown for different providers", () => {
-    const requester = profile("requester", {
-      skills: ["python"],
-      cfRating: 1500,
-      lcRating: 1_000,
-    });
-    const mixed = profile("mixed", {
-      skills: ["python"],
-      cfRating: 1600,
-      lcRating: 6_000,
-    });
-    const differentProvider = profile("different", {
-      skills: ["python"],
-      cfRating: null,
-      lcRating: 1_500,
-    });
-    requester.lcRating = null;
+  it("does not filter candidates that miss nice-to-have values", () => {
+    const configuration = project("FRONTEND", "typescript");
+    if (configuration.intentType !== "PROJECT") throw new Error("fixture");
+    configuration.search.niceToHaveLanguages = ["python"];
+    const requester = profile("requester", configuration);
+    const candidate = profile("candidate", project("FRONTEND", "typescript"));
 
-    const mixedRequester = { ...requester, lcRating: 1_000 };
-    expect(evaluateRecommendation(mixedRequester, mixed, "DSA")?.snapshot)
-      .toMatchObject({ compatibility: "LOW", levelSource: "MIXED_CP" });
-    expect(evaluateRecommendation(requester, differentProvider, "DSA")?.snapshot)
-      .toMatchObject({ compatibility: "UNKNOWN", levelSource: "UNKNOWN" });
+    expect(evaluateRecommendation(requester, candidate, "PROJECT")?.snapshot.niceToHave)
+      .toEqual({ matchedGroupCount: 0, totalGroupCount: 1, matchedValueCount: 0 });
   });
 
-  it("treats optional preferences as a controlled relaxation without lowering the floor", () => {
-    const requester = profile("requester", {
-      skills: ["typescript", "react", "web"],
-      searchIntent: {
-        intentType: "PROJECT",
-        preferredLanguages: ["python"],
-        preferredDomains: ["web"],
-      },
-    });
-    const candidate = profile("candidate", {
-      skills: ["typescript", "react", "web"],
-      effectiveOpenToIntents: ["PROJECT"],
-    });
-    const result = evaluateRecommendation(requester, candidate, "PROJECT");
-
-    expect(result?.preferencesMatched).toBeFalse();
-    expect(result?.snapshot.matchTier).toBe("RELAXED_PREFERENCES");
-    expect(result?.snapshot.similarityScore).toBeGreaterThanOrEqual(0.2);
+  it("keeps For You inbound-intent eligibility even when a profile is otherwise valid for Explore", () => {
+    const requester = profile("requester", dsa());
+    const candidate = profile("candidate", dsa(), { effectiveOpenToIntents: [] });
+    expect(evaluateRecommendation(requester, candidate, "DSA")).toBeNull();
   });
 
-  it("uses only GitHub-derived features for Open Source similarity", () => {
-    const github = {
-      connected: true,
-      usable: true,
-      contributionsLastYear: 250,
-      activeWeeksLastYear: 30,
-      stars: 20,
-      topics: ["react"],
-      lastSyncedAt: "2026-07-16T00:00:00.000Z",
-    };
-    const requester = profile("requester", {
-      skills: ["python", "django"],
-      topLanguages: ["typescript"],
-      github,
-      searchIntent: {
-        intentType: "OPENSOURCE",
-        preferredLanguages: [],
-        preferredDomains: [],
-      },
-    });
-    const candidate = profile("candidate", {
-      skills: ["python", "django"],
-      topLanguages: ["java"],
-      github: { ...github, topics: ["spring"] },
-      effectiveOpenToIntents: ["OPENSOURCE"],
-    });
-    const overlapping = profile("overlapping", {
-      skills: ["rust"],
-      topLanguages: ["typescript"],
-      github: { ...github, topics: ["react"] },
-      effectiveOpenToIntents: ["OPENSOURCE"],
-    });
-
-    expect(evaluateRecommendation(requester, candidate, "OPENSOURCE")).toBeNull();
-    expect(evaluateRecommendation(requester, overlapping, "OPENSOURCE")?.snapshot)
-      .toMatchObject({ compatibility: "HIGH", levelSource: "GITHUB" });
-  });
-
-  it("orders compatibility before a higher similarity score", () => {
-    const base = profile("base", { skills: ["python"] });
-    const high = {
-      ...base,
-      userId: "high",
-      compatibility: "HIGH",
+  it("orders compatibility before nice-to-have and technical fit", () => {
+    const baseProfile = profile("base", dsa());
+    const baseSnapshot: RecommendationSnapshot = {
       similarityScore: 0.2,
-      levelBand: "NEAR",
+      technicalFitScore: 0.2,
+      compatibility: "HIGH",
       levelSource: "CODEFORCES",
+      resolvedMatchMode: "DIRECT",
       matchedSkills: ["python"],
       matchedLanguages: ["python"],
+      matchedFrameworks: [],
       matchedDomains: [],
-      matchTier: "STRICT",
+      matchedRoles: [],
+      matchedGoals: ["INTERVIEW_PREP"],
+      matchedContributionTypes: [],
+      matchedRepositoryTopics: [],
+      niceToHave: { matchedGroupCount: 0, totalGroupCount: 0, matchedValueCount: 0 },
+      capabilityEvidence: [],
+      reasonCodes: [],
+      explanation: {
+        intentType: "DSA",
+        compatibility: "HIGH",
+        levelSource: "CODEFORCES",
+        resolvedMatchMode: "DIRECT",
+        reasonCodes: [],
+        capabilityEvidence: [],
+      },
+    };
+    const high = {
+      ...baseProfile,
+      ...baseSnapshot,
+      userId: "high",
+      levelBand: "NEAR",
     } satisfies CandidateResult;
     const medium = {
       ...high,
       userId: "medium",
       compatibility: "MEDIUM",
+      technicalFitScore: 1,
       similarityScore: 1,
       levelBand: "MID",
     } satisfies CandidateResult;
 
     expect([medium, high].sort(compareCandidateResults).map((candidate) => candidate.userId))
       .toEqual(["high", "medium"]);
+  });
+});
+
+describe("Explore ordering", () => {
+  function explore(userId: string, overrides: Partial<ExploreCandidateResult> = {}): ExploreCandidateResult {
+    return {
+      ...profile(userId, dsa(), { searchIntent: null, intentConfigurations: {}, effectiveOpenToIntents: [] }),
+      similarityScore: 0.8,
+      sharedSkills: ["typescript"],
+      sharedSkillCount: 1,
+      experienceProximity: 0.5,
+      experienceSource: "CODEFORCES",
+      ...overrides,
+    };
+  }
+
+  it("uses the documented deterministic tuple without intent eligibility", () => {
+    const candidates = [
+      explore("z", { profileScore: 99 }),
+      explore("a", { profileScore: 99 }),
+      explore("skills", { sharedSkillCount: 2 }),
+      explore("similar", { similarityScore: 0.9, sharedSkillCount: 0 }),
+    ];
+    expect(candidates.sort(compareExploreCandidates).map((candidate) => candidate.userId))
+      .toEqual(["similar", "skills", "a", "z"]);
   });
 });
