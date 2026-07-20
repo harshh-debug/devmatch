@@ -32,15 +32,11 @@ export function BuildIntentForm({ value, onChange }: { value: BuildConfiguration
             {COLLABORATION_MODES.map((mode) => <option key={mode}>{mode}</option>)}
           </select>
         </label>
-        <p className="text-[11px] text-muted">Values within a group use OR; separate required groups use AND.</p>
-        <PreferenceMultiSelect legend="Required roles" values={COLLABORATION_ROLES} selected={value.search.requiredRoles} onChange={(requiredRoles) => updateSearch({ requiredRoles })} />
-        <PreferenceMultiSelect legend="Required languages" values={SKILL_LANGUAGES} selected={value.search.requiredLanguages} onChange={(requiredLanguages) => updateSearch({ requiredLanguages })} />
-        <PreferenceMultiSelect legend="Required frameworks" values={SKILL_FRAMEWORKS} selected={value.search.requiredFrameworks} onChange={(requiredFrameworks) => updateSearch({ requiredFrameworks })} />
-        <PreferenceMultiSelect legend="Required domains" values={SKILL_DOMAINS} selected={value.search.requiredDomains} onChange={(requiredDomains) => updateSearch({ requiredDomains })} />
-        <PreferenceMultiSelect legend="Nice-to-have roles" values={COLLABORATION_ROLES} selected={value.search.niceToHaveRoles} onChange={(niceToHaveRoles) => updateSearch({ niceToHaveRoles })} />
-        <PreferenceMultiSelect legend="Nice-to-have languages" values={SKILL_LANGUAGES} selected={value.search.niceToHaveLanguages} onChange={(niceToHaveLanguages) => updateSearch({ niceToHaveLanguages })} />
-        <PreferenceMultiSelect legend="Nice-to-have frameworks" values={SKILL_FRAMEWORKS} selected={value.search.niceToHaveFrameworks} onChange={(niceToHaveFrameworks) => updateSearch({ niceToHaveFrameworks })} />
-        <PreferenceMultiSelect legend="Nice-to-have domains" values={SKILL_DOMAINS} selected={value.search.niceToHaveDomains} onChange={(niceToHaveDomains) => updateSearch({ niceToHaveDomains })} />
+        <p className="text-[11px] text-muted">Domains are the primary filter. Roles, languages, and frameworks broaden results; matching more of your selections ranks a developer higher.</p>
+        <PreferenceMultiSelect legend="Matching domains" values={SKILL_DOMAINS} selected={value.search.requiredDomains} onChange={(requiredDomains) => updateSearch({ requiredDomains })} />
+        <PreferenceMultiSelect legend="Matching languages" values={SKILL_LANGUAGES} selected={value.search.requiredLanguages} onChange={(requiredLanguages) => updateSearch({ requiredLanguages })} />
+        <PreferenceMultiSelect legend="Matching frameworks" values={SKILL_FRAMEWORKS} selected={value.search.requiredFrameworks} onChange={(requiredFrameworks) => updateSearch({ requiredFrameworks })} />
+        <PreferenceMultiSelect legend="Matching roles" values={COLLABORATION_ROLES} selected={value.search.requiredRoles} onChange={(requiredRoles) => updateSearch({ requiredRoles })} />
       </section>
     </div>
   );

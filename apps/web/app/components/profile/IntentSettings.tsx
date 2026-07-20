@@ -37,7 +37,7 @@ export function IntentSettings() {
       queryClient.setQueryData(["users", "me", "intents"], nextState);
       void queryClient.invalidateQueries({ queryKey: ["users", "me"] });
       void queryClient.invalidateQueries({ queryKey: ["candidates"] });
-      void queryClient.invalidateQueries({ queryKey: ["similar"] });
+      void queryClient.invalidateQueries({ queryKey: ["explore"] });
     },
     onError: (failure) => setError(failure instanceof ApiError ? failure.message : "Could not update inbound intents."),
   });

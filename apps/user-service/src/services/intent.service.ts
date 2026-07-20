@@ -126,10 +126,11 @@ function normalizeConfiguration(input: IntentConfigurationInput): IntentConfigur
         requiredLanguages: normalizeLanguages(input.search.requiredLanguages),
         requiredFrameworks: normalizeFrameworks(input.search.requiredFrameworks),
         requiredDomains: normalizeDomains(input.search.requiredDomains),
-        niceToHaveRoles: deduplicate(input.search.niceToHaveRoles),
-        niceToHaveLanguages: normalizeLanguages(input.search.niceToHaveLanguages),
-        niceToHaveFrameworks: normalizeFrameworks(input.search.niceToHaveFrameworks),
-        niceToHaveDomains: normalizeDomains(input.search.niceToHaveDomains),
+        // Project/Hackathon no longer expose or use nice-to-have filters.
+        niceToHaveRoles: [],
+        niceToHaveLanguages: [],
+        niceToHaveFrameworks: [],
+        niceToHaveDomains: [],
       },
     };
   }

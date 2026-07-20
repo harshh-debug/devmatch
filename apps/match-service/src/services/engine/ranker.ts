@@ -27,7 +27,7 @@ import type {
   RecommendationSnapshot,
 } from "./types";
 
-const PROFILE_QUALITY_FLOOR = 30;
+const PROFILE_QUALITY_FLOOR = 20;
 const compatibilityRank: Record<Compatibility, number> = {
   HIGH: 0,
   MEDIUM: 1,
@@ -262,18 +262,6 @@ function evaluateDsa(
   });
 }
 
-function buildGroups(
-  search: Extract<IntentConfiguration, { intentType: "PROJECT" | "HACKATHON" }>["search"],
-  candidateConfiguration: Extract<IntentConfiguration, { intentType: "PROJECT" | "HACKATHON" }>,
-) {
-  return [
-    { required: search.requiredRoles, offered: candidateConfiguration.offer.roles },
-    { required: search.requiredLanguages, offered: candidateConfiguration.offer.languages },
-    { required: search.requiredFrameworks, offered: candidateConfiguration.offer.frameworks },
-    { required: search.requiredDomains, offered: candidateConfiguration.offer.domains },
-  ] satisfies CapabilityGroup[];
-}
-
 function evaluateBuild(
   requester: MatchProfile,
   candidate: MatchProfile,
@@ -281,7 +269,6 @@ function evaluateBuild(
   candidateConfiguration: Extract<IntentConfiguration, { intentType: "PROJECT" | "HACKATHON" }>,
 ): RecommendationSnapshot | null {
   const search = requesterConfiguration.search;
-  if (!requiredGroupsMatch(buildGroups(search, candidateConfiguration))) return null;
   const matchedRoles = intersection(search.requiredRoles, candidateConfiguration.offer.roles);
   const matchedLanguages = intersection(search.requiredLanguages, candidateConfiguration.offer.languages);
   const matchedFrameworks = intersection(search.requiredFrameworks, candidateConfiguration.offer.frameworks);
@@ -289,7 +276,13 @@ function evaluateBuild(
   const matchedCount = matchedRoles.length + matchedLanguages.length + matchedFrameworks.length + matchedDomains.length;
   const requiredCount = search.requiredRoles.length + search.requiredLanguages.length +
     search.requiredFrameworks.length + search.requiredDomains.length;
-  const complementaryFit = ratioScore(matchedCount, requiredCount);
+  // Project/Hackathon discovery is domain-first. A selected domain is the one
+  // hard gate; roles, languages and frameworks broaden the pool and determine
+  // how highly a profile ranks. With no selected domain, any selected match is
+  // enough to enter the pool.
+  if (search.requiredDomains.length > 0 && matchedDomains.length === 0) return null;
+  if (search.requiredDomains.length === 0 && matchedCount === 0) return null;
+  const selectionFit = ratioScore(matchedCount, requiredCount);
   const similarFit = overlapScore(
     labeledFeatures(requesterConfiguration),
     labeledFeatures(candidateConfiguration),
@@ -302,29 +295,16 @@ function evaluateBuild(
   ].some((value) => !labeledFeatures(requesterConfiguration).includes(value));
 
   let resolvedMatchMode: ResolvedMatchMode;
-  let technicalFitScore: number;
+  const technicalFitScore = selectionFit;
   if (search.collaborationMode === "SIMILAR") {
-    if (similarFit <= 0) return null;
     resolvedMatchMode = "SIMILAR";
-    technicalFitScore = similarFit;
   } else if (search.collaborationMode === "COMPLEMENTARY") {
     resolvedMatchMode = "COMPLEMENTARY";
-    technicalFitScore = complementaryFit;
-  } else if (complementaryFit > similarFit || (complementaryFit === similarFit && fillsMissing)) {
+  } else if (selectionFit > similarFit || (selectionFit === similarFit && fillsMissing)) {
     resolvedMatchMode = "COMPLEMENTARY";
-    technicalFitScore = complementaryFit;
   } else {
-    if (similarFit <= 0) return null;
     resolvedMatchMode = "SIMILAR";
-    technicalFitScore = similarFit;
   }
-
-  const niceToHave = countNiceToHaveMatches([
-    { required: search.niceToHaveRoles, offered: candidateConfiguration.offer.roles },
-    { required: search.niceToHaveLanguages, offered: candidateConfiguration.offer.languages },
-    { required: search.niceToHaveFrameworks, offered: candidateConfiguration.offer.frameworks },
-    { required: search.niceToHaveDomains, offered: candidateConfiguration.offer.domains },
-  ]);
   const level = githubCompatibility(requester, candidate);
   const reasonCodes = [
     resolvedMatchMode === "SIMILAR" ? "SIMILAR_OFFER_OVERLAP" : "COMPLEMENTARY_REQUIREMENTS_FILLED",
@@ -338,7 +318,7 @@ function evaluateBuild(
     matchedLanguages,
     matchedFrameworks,
     matchedDomains,
-    niceToHave,
+    niceToHave: { matchedGroupCount: 0, totalGroupCount: 0, matchedValueCount: 0 },
     reasonCodes,
     capabilityEvidence: matchingEvidence(candidateConfiguration, {
       roles: matchedRoles,
@@ -499,6 +479,12 @@ export function evaluateRecommendation(
 }
 
 export function compareCandidateResults(left: CandidateResult, right: CandidateResult) {
+  if (left.explanation.intentType === "PROJECT" || left.explanation.intentType === "HACKATHON") {
+    return right.technicalFitScore - left.technicalFitScore ||
+      compatibilityRank[left.compatibility] - compatibilityRank[right.compatibility] ||
+      right.profileScore - left.profileScore ||
+      left.userId.localeCompare(right.userId);
+  }
   return compatibilityRank[left.compatibility] - compatibilityRank[right.compatibility] ||
     right.niceToHave.matchedGroupCount - left.niceToHave.matchedGroupCount ||
     right.niceToHave.matchedValueCount - left.niceToHave.matchedValueCount ||

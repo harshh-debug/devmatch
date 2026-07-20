@@ -2,6 +2,24 @@ import { prismaClient } from "db/client";
 import { skillTagMapper } from "./skillTagMapper";
 import { buildSkillVector } from "@devmatch/shared";
 
+async function recomputeProfileScore(userId: string) {
+    const user = await prismaClient.user.findUnique({
+        where: { id: userId },
+        include: { profile: true },
+    });
+    if (!user?.profile) return 0;
+
+    let score = 0;
+    if (user.displayName) score += 20;
+    if (user.profile.skillTags.length >= 3) score += 20;
+    if (user.profile.githubUsername) score += 20;
+    if (user.profile.lcRating || user.profile.cfRating) score += 20;
+    if (user.profile.topLanguages.length > 0) score += 20;
+
+    await prismaClient.profile.update({ where: { userId }, data: { profileScore: score } });
+    return score;
+}
+
 export const profileUpdater = {
     async updateGitHubStats(userId: string, fetchedData: any) {
         const existingProfile = await prismaClient.profile.findUnique({
@@ -29,7 +47,7 @@ export const profileUpdater = {
             cfRating: existingProfile.cfRating
         });
 
-        return await prismaClient.profile.update({
+        const updatedProfile = await prismaClient.profile.update({
             where: { userId },
             data: {
                 githubStars: fetchedData.githubStars,
@@ -43,6 +61,8 @@ export const profileUpdater = {
                 lastSyncedAt: new Date(),
             }
         });
+        await recomputeProfileScore(userId);
+        return updatedProfile;
     },
 
     async updateLeetCodeStats(userId: string,handle: string, fetchedData:any) {
@@ -60,7 +80,7 @@ export const profileUpdater = {
             cfRating: existingProfile.cfRating
         });
 
-        return await prismaClient.profile.update({
+        const updatedProfile = await prismaClient.profile.update({
             where: { userId },
             data: {
                 leetcodeHandle:handle,
@@ -74,6 +94,8 @@ export const profileUpdater = {
                 lastSyncedAt: new Date(),
             }
         });
+        await recomputeProfileScore(userId);
+        return updatedProfile;
     },
 
     async updateCodeforcesStats(userId: string,handle: string, fetchedData: any) {
@@ -91,7 +113,7 @@ export const profileUpdater = {
             cfRating: fetchedData.cfRating // <-- New data
         });
 
-        return await prismaClient.profile.update({
+        const updatedProfile = await prismaClient.profile.update({
             where: { userId },
             data: {
                 codeforcesHandle: handle,
@@ -100,5 +122,7 @@ export const profileUpdater = {
                 lastSyncedAt: new Date(),
             }
         });
+        await recomputeProfileScore(userId);
+        return updatedProfile;
     }
 };

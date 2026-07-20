@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/apiClient";
 import { useToken } from "@/hooks/useToken";
@@ -68,7 +69,7 @@ export default function RequestsPage() {
               key={req.userId}
               className="bg-bg border border-border rounded-xl p-4 sm:p-5"
             >
-              <div className="flex items-start gap-3.5">
+              <Link href={`/u/${req.userId}`} className="flex items-start gap-3.5 rounded-lg hover:opacity-80 transition-opacity">
                 {/* Avatar */}
                 <div
                   className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
@@ -110,15 +111,13 @@ export default function RequestsPage() {
                     ))}
                   </div>
 
-                  {/* Codeforces */}
-                  <div className="mt-2.5 flex items-center gap-2">
-                    <span className="text-[10px] text-muted">CF</span>
-                    <span className="font-mono text-[13px] text-ink tabular-nums">
-                      {req.cfRating || "N/A"}
-                    </span>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted">
+                    <span>CF <span className="font-mono text-[13px] text-ink tabular-nums">{req.cfRating ?? "N/A"}</span></span>
+                    <span>LC rank <span className="font-mono text-[13px] text-ink tabular-nums">{req.lcRating ?? "N/A"}</span></span>
+                    <span>Profile <span className="font-mono text-[13px] text-ink tabular-nums">{req.profileScore ?? 0}</span></span>
                   </div>
                 </div>
-              </div>
+              </Link>
 
               <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border">
                 <button

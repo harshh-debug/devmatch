@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/apiClient";
 
 const NAV_ITEMS = [
@@ -123,7 +123,20 @@ export default function AppShellLayout({
 }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const queryClient = useQueryClient();
   const counts = useUnreadCounts();
+
+  async function handleSignOut() {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    setSidebarOpen(false);
+    // Auth.js clears its session cookie; clearing TanStack data prevents a
+    // subsequent user on this browser from briefly seeing the old account.
+    queryClient.clear();
+    await signOut({ redirect: false });
+    window.location.assign("/");
+  }
 
   const isActive = (href: string) => {
     if (href === "/chat") {
@@ -235,7 +248,8 @@ export default function AppShellLayout({
         {/* Sign out */}
         <div className="p-3 border-t border-[#262626]">
           <button
-            onClick={() => signOut({ redirectTo: "/login" })}
+            onClick={() => void handleSignOut()}
+            disabled={isSigningOut}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-[13px] font-medium text-white/50 hover:text-white hover:bg-white/5 transition-colors duration-fast"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -243,7 +257,7 @@ export default function AppShellLayout({
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
-            Sign Out
+            {isSigningOut ? "Signing out…" : "Sign Out"}
           </button>
         </div>
       </aside>

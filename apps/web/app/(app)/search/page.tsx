@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/apiClient";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiError, apiFetch } from "@/lib/apiClient";
 import { useToken } from "@/hooks/useToken";
 
 type SearchResult = {
@@ -19,6 +19,9 @@ export default function SearchPage() {
   const token = useToken();
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
+  const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const timeout = setTimeout(() => setSearch(query.trim()), 300);
@@ -28,6 +31,23 @@ export default function SearchPage() {
     queryKey: ["users", "search", search],
     queryFn: () => apiFetch<SearchResult[]>("/users/search", { token, query: { q: search } }),
     enabled: !!token && search.length >= 2,
+  });
+  const connectMutation = useMutation({
+    mutationFn: (targetId: string) => apiFetch<{ isMutual: boolean }>("/match/action", {
+      token,
+      method: "POST",
+      body: { targetId, action: "ACCEPTED", connectionContext: "GENERAL" },
+    }),
+    onSuccess: (_result, targetId) => {
+      setConnectError(null);
+      setRequestedIds((current) => new Set(current).add(targetId));
+      void queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      void queryClient.invalidateQueries({ queryKey: ["explore"] });
+      void queryClient.invalidateQueries({ queryKey: ["match", "requests"] });
+      void queryClient.invalidateQueries({ queryKey: ["match", "matches"] });
+      void queryClient.invalidateQueries({ queryKey: ["chat", "rooms"] });
+    },
+    onError: (error) => setConnectError(error instanceof ApiError ? error.message : "Could not send the request."),
   });
 
   return (
@@ -49,7 +69,8 @@ export default function SearchPage() {
           <p className="p-5 text-[13px] text-muted">No developers found.</p>
         )}
         {!isFetching && users.map((user) => (
-          <Link key={user.id} href={`/u/${user.id}`} className="flex items-center gap-3 p-4 hover:bg-surface transition-colors">
+          <div key={user.id} className="flex items-center gap-3 p-4 hover:bg-surface transition-colors">
+            <Link href={`/u/${user.id}`} className="flex min-w-0 flex-1 items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-ink/10 flex items-center justify-center text-xs font-semibold text-ink">
               {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" /> : (user.displayName?.[0] ?? user.username[0]?.toUpperCase())}
             </div>
@@ -58,9 +79,18 @@ export default function SearchPage() {
               <p className="text-[12px] text-muted truncate">@{user.username}{user.college ? ` · ${user.college}` : ""}</p>
             </div>
             {user.skillTags?.length ? <span className="text-[11px] text-muted">{user.skillTags.slice(0, 2).join(" · ")}</span> : null}
-          </Link>
+            </Link>
+            <button
+              onClick={() => connectMutation.mutate(user.id)}
+              disabled={connectMutation.isPending || requestedIds.has(user.id)}
+              className="shrink-0 rounded-lg border border-primary/30 px-3 py-1.5 text-[11px] font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
+            >
+              {requestedIds.has(user.id) ? "Request sent" : connectMutation.isPending ? "Sending…" : "Connect"}
+            </button>
+          </div>
         ))}
       </div>
+      {connectError && <p className="mt-3 text-[12px] text-red-500">{connectError}</p>}
     </div>
   );
 }

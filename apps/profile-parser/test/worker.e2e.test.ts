@@ -78,6 +78,7 @@ describe("Profile Parser E2E Worker Tests", () => {
         
         expect(profile?.skillVector).toBeInstanceOf(Array);
         expect(profile?.skillVector?.length).toBe(22);
+        expect(profile?.profileScore).toBeGreaterThanOrEqual(40);
 
         expect(mockPublish).toHaveBeenCalledWith(
             "profile.updated",

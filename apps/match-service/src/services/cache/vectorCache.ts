@@ -17,7 +17,7 @@ import type { MatchProfile } from "../engine/types";
 
 const PROFILES_HASH = "match_profiles";
 const GLOBAL_EXCLUSION_KEY = (userId: string) => `match-excluded:${userId}`;
-const PROFILE_QUALITY_FLOOR = 30;
+const PROFILE_QUALITY_FLOOR = 20;
 
 type DbUser = Awaited<ReturnType<typeof loadUsers>>[number];
 

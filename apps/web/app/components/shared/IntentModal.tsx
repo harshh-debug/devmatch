@@ -135,7 +135,7 @@ export function IntentModal({
       queryClient.setQueryData(["users", "me", "intents"], nextState);
       void queryClient.invalidateQueries({ queryKey: ["users", "me"] });
       void queryClient.invalidateQueries({ queryKey: ["candidates"] });
-      void queryClient.invalidateQueries({ queryKey: ["similar"] });
+      void queryClient.invalidateQueries({ queryKey: ["explore"] });
       onSaved?.(nextState);
       onClose();
     },

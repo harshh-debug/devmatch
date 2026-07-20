@@ -3,9 +3,9 @@
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { apiFetch } from "@/lib/apiClient";
+import { ApiError, apiFetch } from "@/lib/apiClient";
 import type { UserProfile } from "@/lib/types";
 import AppShellLayout from "@/app/(app)/layout";
 import { GitHubActivity } from "@/app/components/profile/GitHubActivity";
@@ -25,8 +25,10 @@ export default function PublicProfilePage() {
   const params = useParams();
   const router = useRouter();
   const { data: session } = useSession();
+  const queryClient = useQueryClient();
   const username = params.username as string;
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
 
   const { data: profile, isLoading, error } = useQuery({
     queryKey: ["users", "public", username],
@@ -44,6 +46,24 @@ export default function PublicProfilePage() {
     enabled: !!session?.accessToken,
   });
   const isConnected = !!profile && rooms.some((room) => room.otherUserId === profile.id);
+  const connectMutation = useMutation({
+    mutationFn: () => apiFetch<{ isMutual: boolean }>("/match/action", {
+      token: session?.accessToken,
+      method: "POST",
+      body: { targetId: profile!.id, action: "ACCEPTED", connectionContext: "GENERAL" },
+    }),
+    onSuccess: (result) => {
+      setRequestSent(!result.isMutual);
+      setShowConnectModal(false);
+      void queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      void queryClient.invalidateQueries({ queryKey: ["explore"] });
+      void queryClient.invalidateQueries({ queryKey: ["match", "requests"] });
+      if (result.isMutual) {
+        void queryClient.invalidateQueries({ queryKey: ["match", "matches"] });
+        void queryClient.invalidateQueries({ queryKey: ["chat", "rooms"] });
+      }
+    },
+  });
 
   if (isLoading) {
     return (
@@ -117,6 +137,8 @@ export default function PublicProfilePage() {
             </div>
             {isConnected ? (
               <span className="px-4 py-2 text-[12px] font-medium rounded-lg border border-success/30 bg-success/10 text-success shrink-0">Connected</span>
+            ) : requestSent ? (
+              <span className="px-4 py-2 text-[12px] font-medium rounded-lg border border-primary/30 bg-primary/10 text-primary shrink-0">Request sent</span>
             ) : (
               <button
                 onClick={handleConnect}
@@ -213,7 +235,7 @@ export default function PublicProfilePage() {
                 Connect with {profile.displayName || profile.username}
               </h2>
               <p className="text-[13px] text-muted mb-5">
-                You&apos;ll be redirected to the discover feed to start matching.
+                Send a general connection request. It is not tied to a search intent.
               </p>
               <div className="flex gap-3">
                 <button
@@ -222,13 +244,15 @@ export default function PublicProfilePage() {
                 >
                   Cancel
                 </button>
-                <Link
-                  href="/discover"
-                  className="flex-1 text-center py-2.5 text-[13px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast"
+                <button
+                  onClick={() => connectMutation.mutate()}
+                  disabled={connectMutation.isPending}
+                  className="flex-1 text-center py-2.5 text-[13px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast disabled:opacity-50"
                 >
-                  Start matching
-                </Link>
+                  {connectMutation.isPending ? "Sending…" : "Send request"}
+                </button>
               </div>
+              {connectMutation.error && <p className="mt-3 text-[12px] text-red-500">{connectMutation.error instanceof ApiError ? connectMutation.error.message : "Could not send the request."}</p>}
             </div>
           </div>
         )}

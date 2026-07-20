@@ -162,7 +162,7 @@ export async function getPendingRequests(userId: string) {
     if (!action) return null;
     const user = await prismaClient.user.findUnique({ where: { id: requesterId }, include: { profile: true } });
     if (!user) return null;
-    return { userId: user.id, username: user.username, displayName: user.displayName, avatarUrl: user.avatarUrl, college: user.college, profileScore: user.profile?.profileScore ?? 0, cfRating: user.profile?.cfRating ?? null, skillTags: user.profile?.skillTags ?? [], requestedIntent: pair.connectionContext, requestedAt: pair.createdAt };
+    return { userId: user.id, username: user.username, displayName: user.displayName, avatarUrl: user.avatarUrl, college: user.college, profileScore: user.profile?.profileScore ?? 0, cfRating: user.profile?.cfRating ?? null, lcRating: user.profile?.lcRating ?? null, skillTags: user.profile?.skillTags ?? [], requestedIntent: pair.connectionContext, requestedAt: pair.createdAt };
   }));
   return requests.filter((request): request is NonNullable<typeof request> => request !== null);
 }

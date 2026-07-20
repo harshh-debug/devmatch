@@ -152,15 +152,19 @@ describe("intent-specific matching", () => {
       });
   });
 
-  it("does not filter candidates that miss nice-to-have values", () => {
+  it("uses domains as the Project gate while roles and languages rank the result", () => {
     const configuration = project("FRONTEND", "typescript");
     if (configuration.intentType !== "PROJECT") throw new Error("fixture");
-    configuration.search.niceToHaveLanguages = ["python"];
+    configuration.search.requiredDomains = ["ml"];
     const requester = profile("requester", configuration);
-    const candidate = profile("candidate", project("FRONTEND", "typescript"));
+    const candidate = profile("candidate", project("ML_AI", "python"));
 
-    expect(evaluateRecommendation(requester, candidate, "PROJECT")?.snapshot.niceToHave)
-      .toEqual({ matchedGroupCount: 0, totalGroupCount: 1, matchedValueCount: 0 });
+    expect(evaluateRecommendation(requester, candidate, "PROJECT")?.snapshot)
+      .toMatchObject({ matchedDomains: ["ml"], matchedRoles: [], matchedLanguages: [] });
+    const candidateProject = candidate.intentConfigurations.PROJECT;
+    if (!candidateProject || candidateProject.intentType !== "PROJECT") throw new Error("fixture");
+    candidateProject.offer.domains = ["web"];
+    expect(evaluateRecommendation(requester, candidate, "PROJECT")).toBeNull();
   });
 
   it("keeps For You inbound-intent eligibility even when a profile is otherwise valid for Explore", () => {

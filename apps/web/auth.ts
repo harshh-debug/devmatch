@@ -162,8 +162,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       }
 
       if (isLoggedIn) {
-        // Authenticated users on login/signup go directly to discover.
-        if (isAuthRoute) {
+        // The public landing page is only for visitors. Signed-in users resume
+        // discovery directly, just like they do from auth routes.
+        if (isAuthRoute || path === "/") {
           return NextResponse.redirect(new URL("/discover", request.nextUrl));
         }
       }
