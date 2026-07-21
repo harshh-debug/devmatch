@@ -154,7 +154,7 @@ export default function AppShellLayout({
   return (
     <div className="min-h-screen bg-bg flex">
       {/* Mobile header */}
-      <div className="fixed top-0 left-0 right-0 h-14 bg-bg/95 backdrop-blur-xl border-b border-border flex items-center justify-between px-4 z-sticky lg:hidden">
+      <div className="fixed left-3 right-3 top-3 z-sticky flex h-14 items-center justify-between rounded-2xl border border-white/15 bg-bg/95 px-4 shadow-xl shadow-black/20 backdrop-blur-xl lg:hidden">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="p-2 -ml-2 text-ink"
@@ -180,7 +180,7 @@ export default function AppShellLayout({
           className="flex items-center gap-2 font-display font-semibold text-[15px] text-ink tracking-tight"
         >
           <span
-            className="w-5 h-5 rounded-[6px] flex items-center justify-center text-[10px] font-bold"
+            className="w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-bold"
             style={{ backgroundColor: "var(--color-primary)", color: "#fff" }}
             aria-hidden="true"
           >
@@ -193,18 +193,18 @@ export default function AppShellLayout({
 
       {/* Desktop sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#0A0A0A] border-r border-[#262626] flex flex-col transition-transform duration-normal lg:translate-x-0 ${
+        className={`fixed bottom-3 left-3 top-3 z-40 flex w-64 flex-col rounded-[1.5rem] border border-white/10 bg-[#0A0A0A] shadow-2xl shadow-black/25 transition-transform duration-normal lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Logo */}
-        <div className="h-14 flex items-center px-5 border-b border-[#262626]">
+        <div className="flex h-16 items-center border-b border-[#262626] px-5">
           <a
             href="/discover"
             className="flex items-center gap-2 font-display font-semibold text-[15px] text-white tracking-tight"
           >
             <span
-              className="w-5 h-5 rounded-[6px] flex items-center justify-center text-[10px] font-bold"
+              className="w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-bold"
               style={{ backgroundColor: "var(--color-primary)", color: "#fff" }}
               aria-hidden="true"
             >
@@ -224,7 +224,7 @@ export default function AppShellLayout({
                 key={item.href}
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors duration-fast ${
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-colors duration-fast ${
                   active
                     ? "text-white bg-white/10"
                     : "text-white/50 hover:text-white hover:bg-white/5"
@@ -250,7 +250,7 @@ export default function AppShellLayout({
           <button
             onClick={() => void handleSignOut()}
             disabled={isSigningOut}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-[13px] font-medium text-white/50 hover:text-white hover:bg-white/5 transition-colors duration-fast"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium text-white/50 transition-colors duration-fast hover:bg-white/5 hover:text-white"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -272,12 +272,12 @@ export default function AppShellLayout({
       )}
 
       {/* Main content area */}
-      <main className="flex-1 lg:pl-64 pt-14 lg:pt-0 pb-16 lg:pb-0 min-h-screen">
+      <main className="min-h-screen flex-1 pb-16 pt-20 lg:pb-0 lg:pl-[17rem] lg:pt-0">
         {children}
       </main>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#0A0A0A] border-t border-[#262626] flex items-center justify-around px-2 z-sticky lg:hidden">
+      <nav className="fixed bottom-3 left-3 right-3 z-sticky flex h-16 items-center justify-around rounded-2xl border border-white/10 bg-[#0A0A0A] px-2 shadow-2xl shadow-black/30 lg:hidden">
         {NAV_ITEMS.slice(0, 5).map((item) => {
           const active = isActive(item.href);
           const badge = badgeFor(item.badgeKey);

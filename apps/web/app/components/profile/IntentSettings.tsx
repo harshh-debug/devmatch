@@ -55,7 +55,7 @@ export function IntentSettings() {
   }
 
   return (
-    <section className="bg-bg border border-border rounded-xl p-5">
+    <section className="rounded-[1.35rem] border border-white/12 bg-surface p-5 shadow-sm sm:p-6">
       {editing && (
         <IntentModal
           initialIntent={editing.intent}
@@ -76,7 +76,7 @@ export function IntentSettings() {
           const active = state?.searchIntentType === intent.id;
           const open = state?.openToIntents.includes(intent.id) ?? false;
           return (
-            <article key={intent.id} className="rounded-xl border border-border p-4">
+            <article key={intent.id} className="rounded-[1rem] border border-white/12 bg-bg p-4 transition hover:border-primary/40">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-[13px] font-medium text-ink">{intent.label}</h3>

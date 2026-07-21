@@ -71,7 +71,6 @@ export interface UserProfile {
   githubStars?: number;
   contributionStreak?: number;
   topLanguages?: string[];
-  profileCompleteness?: number;
   /** Language usage percentages, e.g. { TypeScript: 62, Rust: 24 }. */
   languages?: Record<string, number>;
 }
@@ -111,7 +110,8 @@ export interface ExploreCandidate {
   bio: string | null;
   college: string | null;
   availability: Availability;
-  profileScore: number;
+  cfRating: number | null;
+  lcRating: number | null;
   skillTags: string[];
   similarityScore: number;
   sharedSkills: string[];

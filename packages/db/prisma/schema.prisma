@@ -163,6 +163,8 @@ model Profile {
     githubContributions Json?
     githubTopics       String[]
     githubLastSyncedAt DateTime?
+    leetcodeLastSyncedAt DateTime?
+    codeforcesLastSyncedAt DateTime?
     lcRating           Int?
     cfRating           Int?
     skillVector        Float[]

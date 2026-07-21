@@ -24,13 +24,13 @@ export default function MatchesPage() {
   const roomIdByMatchId = new Map(rooms.map((room) => [room.matchId, room.id]));
 
   return (
-    <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="font-display font-semibold text-[24px] text-ink tracking-tight">
+      <div className="mb-8 rounded-[1.5rem] border border-white/12 bg-surface px-5 py-5 sm:px-6">
+        <h1 className="font-display text-3xl font-semibold tracking-[-0.06em] text-ink">
           Matches
         </h1>
-        <p className="text-[13px] text-muted mt-0.5">
+        <p className="mt-1 text-[14px] text-muted">
           Developers you&apos;ve matched with
         </p>
       </div>
@@ -43,7 +43,7 @@ export default function MatchesPage() {
           return (
           <div
             key={match.matchId}
-            className="bg-bg border border-border rounded-xl p-5 flex flex-col hover:border-ink/20 transition-colors duration-normal"
+            className="flex flex-col rounded-[1.35rem] border border-white/12 bg-surface p-5 shadow-sm transition duration-500 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-xl hover:shadow-black/20"
           >
             {/* Header */}
             <div className="flex items-start gap-3 mb-4">
@@ -83,12 +83,12 @@ export default function MatchesPage() {
             {roomId ? (
               <Link
                 href={`/chat/${roomId}`}
-                className="w-full text-center py-2.5 text-[13px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast"
+                className="w-full rounded-xl bg-primary py-3 text-center text-[13px] font-semibold text-bg transition hover:bg-primary-hover"
               >
                 Open Workspace
               </Link>
             ) : (
-              <span className="w-full text-center py-2.5 text-[13px] font-medium rounded-lg bg-surface text-muted">
+              <span className="w-full rounded-xl bg-bg py-3 text-center text-[13px] font-medium text-muted">
                 Workspace preparing…
               </span>
             )}

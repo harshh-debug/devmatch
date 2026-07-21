@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono } from "next/font/google";
+import { Geist, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist",
+  display: "swap",
+});
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -12,14 +18,13 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "DevMatch — Find your match. In code.",
   description:
-    "Intent-driven developer matching backed by real GitHub data, LeetCode ratings, and mutual consent. No noise. No recruiters. Just collaborators.",
+    "Find DSA partners, hackathon teammates, and coding collaborators through verified developer profiles and mutual matching.",
   keywords: [
-    "developer matching",
-    "hackathon partner",
-    "coding collaborator",
-    "GitHub",
-    "LeetCode",
-    "competitive programming",
+    "DSA partner India",
+    "hackathon teammate India",
+    "college coding collaborator",
+    "competitive programming partner",
+    "developer matching platform",
   ],
   openGraph: {
     title: "DevMatch — Find your match. In code.",
@@ -35,25 +40,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <link
-          rel="preconnect"
-          href="https://api.fontshare.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          rel="stylesheet"
-          href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@1,2,3,4,5,6,7,8,9&display=swap"
-        />
-        <link
-          rel="stylesheet"
-          href="https://api.fontshare.com/v2/css?f[]=satoshi@1,2,3,4,5,6,7,8,9&display=swap"
-        />
-      </head>
-      <body
-        className={`${jetbrainsMono.variable} font-body antialiased bg-bg text-ink`}
-      >
+    <html lang="en">
+      <body className={`${geist.variable} ${jetbrainsMono.variable} bg-bg font-sans text-ink antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>

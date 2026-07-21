@@ -4,7 +4,8 @@ import bcrypt from "bcrypt";
 import { getGitHubIdentity, getGitHubProfile, resolveUsername, type GitHubUser } from "../services/github.services";
 import { issueToken } from "../services/token.service";
 import { generateUsername, safeUser } from "../services/user.service";
-import { profileSyncQueue, type SyncPlatform } from '@devmatch/bullmq';
+import { enqueueProfileSync, type SyncPlatform } from '@devmatch/bullmq';
+import { scheduleStaleProfileSyncs } from "../services/staleProfileSync.service";
 
 
 
@@ -53,6 +54,8 @@ export const loginUser = async (req: Request, res: Response) => {
 			token,
 			user: safeUser(user),
 		};
+
+		scheduleStaleProfileSyncs(user.id);
 
 		return res.status(200).json(response);
 	} catch (error) {
@@ -174,7 +177,7 @@ export const oauthUser = async (req: Request, res: Response) => {
 
                 // Trigger the background sync for the linked account
                 const platform: SyncPlatform = "github";
-                await profileSyncQueue.add(platform, {
+                await enqueueProfileSync({
                     userId: user.id,
                     handle: githubUser.username,
                     platform,
@@ -207,7 +210,7 @@ export const oauthUser = async (req: Request, res: Response) => {
 
                 // Trigger the background sync for the brand new user
                 const platform: SyncPlatform = "github";
-                await profileSyncQueue.add(platform, {
+                await enqueueProfileSync({
                     userId: user.id,
                     handle: githubUser.username,
                     platform,
@@ -227,6 +230,8 @@ export const oauthUser = async (req: Request, res: Response) => {
             token,
             user: safeUser(user),
         };
+
+        scheduleStaleProfileSyncs(user.id);
 
         return res.status(200).json(response);
     } catch (error) {
@@ -290,7 +295,7 @@ export const linkGitHub = async (req: Request, res: Response) => {
 
         // 6. Trigger the BullMQ background sync
         const platform: SyncPlatform = "github";
-        await profileSyncQueue.add(platform, {
+        await enqueueProfileSync({
             userId: userId,
             handle: githubUser.username,
             platform,

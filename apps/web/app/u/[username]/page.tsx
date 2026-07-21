@@ -111,9 +111,9 @@ export default function PublicProfilePage() {
         </a>
       </header>
 
-      <main className="max-w-3xl mx-auto px-5 py-8 sm:py-12">
+      <main className="mx-auto max-w-4xl px-5 py-8 sm:py-12">
         {/* Profile card */}
-        <div className="border border-border rounded-2xl p-6 sm:p-8">
+        <div className="rounded-[1.75rem] border border-white/12 bg-surface p-6 shadow-xl shadow-black/15 sm:p-8">
           {/* Avatar + name */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-6 mb-8">
             <div
@@ -127,7 +127,7 @@ export default function PublicProfilePage() {
               {profile.avatarUrl ? <img src={profile.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" /> : initials(profile.displayName)}
             </div>
             <div className="text-center sm:text-left flex-1">
-              <h1 className="font-display font-semibold text-[24px] text-ink tracking-tight">
+              <h1 className="font-display text-3xl font-semibold tracking-[-0.06em] text-ink">
                 {profile.displayName || profile.username}
               </h1>
               <p className="text-[13px] text-muted mt-0.5">{profile.college || "—"}</p>
@@ -142,7 +142,7 @@ export default function PublicProfilePage() {
             ) : (
               <button
                 onClick={handleConnect}
-                className="px-5 py-2.5 text-[13px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast shrink-0"
+                className="shrink-0 rounded-xl bg-primary px-5 py-2.5 text-[13px] font-semibold text-bg transition hover:bg-primary-hover"
               >
                 Connect
               </button>
@@ -178,10 +178,14 @@ export default function PublicProfilePage() {
 
           <div className="space-y-4 mb-8">
             <GitHubActivity profile={profile} />
+            <div>
+              <h2 className="text-[11px] text-muted tracking-wide mb-1.5">COMPETITIVE PROGRAMMING</h2>
+              <p className="text-[12px] text-muted">These public stats help collaborators understand this developer’s DSA background. They are not a profile-completeness score.</p>
+            </div>
             <div className="grid sm:grid-cols-2 gap-4">
 
             {/* Codeforces / competitive */}
-            <div className="border border-border rounded-xl p-4">
+            <div className="rounded-[1.15rem] border border-white/12 bg-bg p-4">
               <div className="flex items-center gap-2 mb-3">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-info" aria-hidden="true">
                   <rect x="1" y="14" width="4" height="7" rx="1" />
@@ -202,17 +206,15 @@ export default function PublicProfilePage() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted">COMPLETENESS</p>
-                  <p className="font-mono text-[18px] text-ink tabular-nums">
-                    {profile.profileCompleteness != null
-                      ? `${profile.profileCompleteness}%`
-                      : "—"}
+                  <p className="text-[10px] text-muted">HANDLE</p>
+                  <p className="font-mono text-[13px] text-ink tabular-nums truncate">
+                    {profile.codeforcesHandle ? `@${profile.codeforcesHandle}` : "—"}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="border border-border rounded-xl p-4">
+            <div className="rounded-[1.15rem] border border-white/12 bg-bg p-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[13px] font-medium text-ink">LeetCode</span>
                 <span className="font-mono text-[13px] text-ink">#{profile.lcRating ?? "—"}</span>
@@ -230,7 +232,7 @@ export default function PublicProfilePage() {
         {showConnectModal && (
           <div className="fixed inset-0 z-modal flex items-center justify-center px-5">
             <div className="absolute inset-0 bg-black/50" onClick={() => setShowConnectModal(false)} />
-            <div className="relative bg-bg border border-border rounded-2xl p-6 max-w-sm w-full shadow-lg">
+            <div className="relative w-full max-w-sm rounded-[1.5rem] border border-white/15 bg-surface p-6 shadow-2xl shadow-black/40">
               <h2 className="font-display font-semibold text-[18px] text-ink tracking-tight mb-2">
                 Connect with {profile.displayName || profile.username}
               </h2>

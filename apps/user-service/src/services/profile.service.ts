@@ -64,7 +64,11 @@ export const profileService = {
     if (user.profile) {
       if (user.profile.skillTags && user.profile.skillTags.length >= 3) score += 20;
       if (user.profile.githubUsername) score += 20;
-      if (user.profile.lcRating || user.profile.cfRating) score += 20;
+      // Competitive-programming accounts are independent signals. Keeping
+      // them separate means a profile without Codeforces cannot appear fully
+      // complete simply because LeetCode is connected (or vice versa).
+      if (user.profile.lcRating) score += 10;
+      if (user.profile.cfRating) score += 10;
       if (user.profile.topLanguages && user.profile.topLanguages.length > 0) score += 20;
     }
 

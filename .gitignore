@@ -40,3 +40,5 @@ yarn-error.log*
 e2e*
 implementation*.md
 *test.ts
+aura*
+about.md

@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { profileService } from "../services/profile.service";
 import { connectPlatformSchema } from "../validators/user.validators";
-import { profileSyncQueue, type SyncPlatform } from "@devmatch/bullmq";
+import { enqueueProfileSync, type SyncPlatform } from "@devmatch/bullmq";
 import { validateLeetCodeHandle } from "../services/leetcodeValidator";
 import { validateCodeforcesHandle } from "../services/codeforcesValidator";
 
@@ -24,7 +24,7 @@ export const connectHandler = {
 
       const platform: SyncPlatform = "github";
 
-      await profileSyncQueue.add(platform, {
+      await enqueueProfileSync({
         userId,
         handle: user.profile.githubUsername,
         platform,
@@ -69,7 +69,7 @@ export const connectHandler = {
 
       const platform: SyncPlatform = "leetcode";
 
-      await profileSyncQueue.add(platform, {
+      await enqueueProfileSync({
         userId,
         handle,
         platform,
@@ -114,7 +114,7 @@ export const connectHandler = {
 
       const platform: SyncPlatform = "codeforces";
 
-      await profileSyncQueue.add(platform, {
+      await enqueueProfileSync({
         userId,
         handle,
         platform,

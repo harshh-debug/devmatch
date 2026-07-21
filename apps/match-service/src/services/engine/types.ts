@@ -58,6 +58,8 @@ export interface MatchProfile {
 export interface CandidateResult extends MatchProfile, RecommendationSnapshot {
   technicalFitScore: number;
   levelBand: "NEAR" | "MID" | "FAR" | "UNKNOWN";
+  experienceProximity: number;
+  experienceSource: "CODEFORCES" | "LEETCODE" | "GITHUB" | "UNKNOWN";
 }
 
 export interface ExploreCandidateResult extends MatchProfile {

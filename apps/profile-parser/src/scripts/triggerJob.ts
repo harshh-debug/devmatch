@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { profileSyncQueue } from "@devmatch/bullmq";
+import { enqueueProfileSync } from "@devmatch/bullmq";
 
 async function run() {
     const userId = process.argv[2]; 
@@ -13,7 +13,7 @@ async function run() {
 
     console.log(`Dropping ${platform} sync job for ${handle} into Redis...`);
 
-    await profileSyncQueue.add(platform, {
+    await enqueueProfileSync({
         userId,
         handle,
         platform

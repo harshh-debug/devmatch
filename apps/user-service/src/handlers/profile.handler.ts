@@ -14,7 +14,6 @@ function toPublicProfile(user: NonNullable<Awaited<ReturnType<typeof profileServ
 	return {
 		...identity,
 		...metrics,
-		profileCompleteness: profile?.profileScore,
 	};
 }
 
@@ -101,6 +100,10 @@ export const profileHandler = {
 
 			if (!parsed.success) {
 				return res.status(400).json({
+					code: "VALIDATION_ERROR",
+					message: parsed.error.issues
+						.map((issue) => `${issue.path.join(".") || "profile"}: ${issue.message}`)
+						.join("; "),
 					errors: parsed.error.format(),
 				});
 			}

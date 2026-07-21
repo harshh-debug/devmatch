@@ -13,7 +13,8 @@ async function recomputeProfileScore(userId: string) {
     if (user.displayName) score += 20;
     if (user.profile.skillTags.length >= 3) score += 20;
     if (user.profile.githubUsername) score += 20;
-    if (user.profile.lcRating || user.profile.cfRating) score += 20;
+    if (user.profile.lcRating) score += 10;
+    if (user.profile.cfRating) score += 10;
     if (user.profile.topLanguages.length > 0) score += 20;
 
     await prismaClient.profile.update({ where: { userId }, data: { profileScore: score } });
@@ -90,6 +91,7 @@ export const profileUpdater = {
                 lcEasySolved: fetchedData.lcEasySolved,
                 lcMediumSolved: fetchedData.lcMediumSolved,
                 lcHardSolved: fetchedData.lcHardSolved,
+                leetcodeLastSyncedAt: new Date(),
                 skillVector: newVector,
                 lastSyncedAt: new Date(),
             }
@@ -118,6 +120,7 @@ export const profileUpdater = {
             data: {
                 codeforcesHandle: handle,
                 cfRating: fetchedData.cfRating,
+                codeforcesLastSyncedAt: new Date(),
                 skillVector: newVector,
                 lastSyncedAt: new Date(),
             }

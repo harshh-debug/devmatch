@@ -73,12 +73,12 @@ export default function ChatListPage() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] lg:h-screen">
+    <div className="flex h-[calc(100vh-5rem)] px-3 pb-3 lg:h-screen lg:p-3">
       {/* Chat list sidebar */}
-      <div className="w-full lg:w-80 xl:w-96 border-r border-border flex flex-col">
+      <div className="flex w-full flex-col overflow-hidden rounded-[1.5rem] border border-white/12 bg-surface lg:w-80 xl:w-96">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-border">
-          <h1 className="font-display font-semibold text-[20px] text-ink tracking-tight">
+        <div className="border-b border-white/10 p-5">
+          <h1 className="font-display text-2xl font-semibold tracking-[-0.055em] text-ink">
             Chat
           </h1>
           <div className="relative mt-3">
@@ -100,7 +100,7 @@ export default function ChatListPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search conversations..."
-              className="w-full pl-9 pr-3 py-2 text-[13px] bg-surface border border-border rounded-lg text-ink placeholder:text-muted/60 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring transition-colors duration-fast"
+              className="w-full rounded-xl border border-white/15 bg-bg py-2.5 pl-9 pr-3 text-[13px] text-ink placeholder:text-muted/60 transition-colors duration-fast focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
         </div>
@@ -120,7 +120,7 @@ export default function ChatListPage() {
       </div>
 
       {/* Empty state (desktop) */}
-      <div className="hidden lg:flex flex-1 items-center justify-center bg-surface/30">
+      <div className="ml-3 hidden flex-1 items-center justify-center rounded-[1.5rem] border border-white/10 bg-surface/50 lg:flex">
         <div className="text-center max-w-xs">
           <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-surface border border-border flex items-center justify-center">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted" aria-hidden="true">

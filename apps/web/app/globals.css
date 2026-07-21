@@ -1,221 +1,105 @@
 @import "tailwindcss";
 
-/* ─── Light Mode ────────────────────────────────────────────── */
-
 :root {
-  --color-bg: oklch(1 0 0);
-  --color-surface: oklch(0.97 0.003 330);
-  --color-ink: oklch(0.12 0.008 330);
-  --color-primary: oklch(0.58 0.22 342);
-  --color-primary-hover: oklch(0.52 0.23 342);
-  --color-accent: oklch(0.55 0.12 210);
-  --color-muted: oklch(0.50 0.005 330);
-  --color-border: oklch(0.90 0.003 330);
-  --color-ring: oklch(0.58 0.22 342);
-  --color-success: oklch(0.55 0.15 145);
-  --color-success-hover: oklch(0.50 0.16 145);
-  --color-success-bg: oklch(0.95 0.03 145);
-  --color-warning: oklch(0.65 0.15 85);
-  --color-warning-hover: oklch(0.60 0.16 85);
-  --color-warning-bg: oklch(0.95 0.03 85);
-  --color-danger: oklch(0.55 0.18 25);
-  --color-danger-hover: oklch(0.50 0.19 25);
-  --color-danger-bg: oklch(0.95 0.03 25);
-  --color-info: oklch(0.55 0.12 210);
-  --color-info-hover: oklch(0.50 0.13 210);
-  --color-info-bg: oklch(0.95 0.03 210);
-
-  --font-display: "Cabinet Grotesk", sans-serif;
-  --font-body: "Satoshi", sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
-
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.25rem;
-  --space-6: 1.5rem;
-  --space-8: 2rem;
-  --space-10: 2.5rem;
-  --space-12: 3rem;
-  --space-16: 4rem;
-  --space-20: 5rem;
-  --space-24: 6rem;
-
-  --radius-sm: 0.25rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-full: 9999px;
-
-  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.08);
-  --shadow-lg: 0 10px 15px -3px oklch(0 0 0 / 0.10);
-
-  --z-dropdown: 100;
-  --z-sticky: 200;
-  --z-modal-bg: 300;
-  --z-modal: 400;
-  --z-toast: 500;
-  --z-tooltip: 600;
-
-  --duration-fast: 150ms;
-  --duration-normal: 300ms;
-  --duration-slow: 500ms;
-
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --background: #050505;
+  --surface: #18181b;
+  --surface-raised: #222227;
+  --ink: #ffffff;
+  --muted: #a1a1aa;
+  --faint: #707078;
+  --border: #29292e;
+  --line: rgba(255, 255, 255, 0.12);
+  --primary: #ea580c;
+  --primary-hover: #c2410c;
+  --accent: #992b0a;
+  --ring: #fb923c;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #fb7185;
+  --color-bg: var(--background);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
 }
 
-/* ─── Dark Mode ─────────────────────────────────────────────── */
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: oklch(0.08 0 0);
-    --color-surface: oklch(0.12 0.003 330);
-    --color-ink: oklch(0.93 0.005 330);
-    --color-primary: oklch(0.72 0.17 342);
-    --color-primary-hover: oklch(0.76 0.17 342);
-    --color-accent: oklch(0.65 0.10 210);
-    --color-muted: oklch(0.55 0.005 330);
-    --color-border: oklch(0.20 0.003 330);
-    --color-ring: oklch(0.72 0.17 342);
-    --color-success: oklch(0.65 0.14 145);
-    --color-success-hover: oklch(0.70 0.14 145);
-    --color-success-bg: oklch(0.15 0.03 145);
-    --color-warning: oklch(0.72 0.14 85);
-    --color-warning-hover: oklch(0.77 0.14 85);
-    --color-warning-bg: oklch(0.15 0.03 85);
-    --color-danger: oklch(0.65 0.16 25);
-    --color-danger-hover: oklch(0.70 0.16 25);
-    --color-danger-bg: oklch(0.15 0.03 25);
-    --color-info: oklch(0.65 0.10 210);
-    --color-info-hover: oklch(0.70 0.10 210);
-    --color-info-bg: oklch(0.15 0.03 210);
-
-    --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
-    --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.4);
-    --shadow-lg: 0 10px 15px -3px oklch(0 0 0 / 0.5);
-  }
-}
-
-/* ─── Tailwind Theme ────────────────────────────────────────── */
-
-@theme {
-  --color-*: initial;
-  --color-bg: var(--color-bg);
-  --color-surface: var(--color-surface);
-  --color-ink: var(--color-ink);
-  --color-primary: var(--color-primary);
-  --color-primary-hover: var(--color-primary-hover);
-  --color-accent: var(--color-accent);
-  --color-muted: var(--color-muted);
-  --color-border: var(--color-border);
-  --color-ring: var(--color-ring);
-  --color-success: var(--color-success);
-  --color-success-hover: var(--color-success-hover);
-  --color-success-bg: var(--color-success-bg);
-  --color-warning: var(--color-warning);
-  --color-warning-hover: var(--color-warning-hover);
-  --color-warning-bg: var(--color-warning-bg);
-  --color-danger: var(--color-danger);
-  --color-danger-hover: var(--color-danger-hover);
-  --color-danger-bg: var(--color-danger-bg);
-  --color-info: var(--color-info);
-  --color-info-hover: var(--color-info-hover);
-  --color-info-bg: var(--color-info-bg);
-
-  --font-display: var(--font-display);
-  --font-body: var(--font-body);
+@theme inline {
+  --color-bg: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-accent: var(--accent);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist);
+  --font-display: var(--font-geist);
   --font-mono: var(--font-mono);
-
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
-  --radius-full: var(--radius-full);
-
-  --shadow-sm: var(--shadow-sm);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
-
-  --animate-fade-in: fade-in 0.5s var(--ease-out);
-  --animate-fade-up: fade-up 0.5s var(--ease-out);
-  --animate-scale-in: scale-in 0.3s var(--ease-spring);
-
-  /* Z-index scale — must live in @theme so Tailwind generates z-* utilities */
-  --z-dropdown: 100;
-  --z-sticky: 200;
-  --z-modal-bg: 300;
-  --z-modal: 400;
-  --z-toast: 500;
-  --z-tooltip: 600;
 }
 
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+* {
+  border-color: var(--border);
 }
-
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(1.5rem); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes scale-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-/* ─── Base Styles ───────────────────────────────────────────── */
 
 html {
+  background: var(--background);
   scroll-behavior: smooth;
 }
 
 body {
-  font-family: var(--font-body);
-  background-color: var(--color-bg);
-  color: var(--color-ink);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  min-width: 320px;
+  background: var(--background);
+  color: var(--ink);
 }
 
-/* Reduced motion */
+::selection {
+  background: var(--primary);
+  color: var(--background);
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+}
+
+.grid-noise {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, black 5%, transparent 80%);
+}
+
+.aura-orbit {
+  background: radial-gradient(circle at 50% 50%, rgba(234, 88, 12, 0.24), transparent 22%), radial-gradient(circle at 60% 39%, rgba(153, 43, 10, 0.23), transparent 1%, transparent 38%);
+}
+
+.marquee-track {
+  animation: marquee 30s linear infinite;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
-}
-
-/* Focus ring */
-:focus-visible {
-  outline: 2px solid var(--color-ring);
-  outline-offset: 2px;
-}
-
-/* Selection */
-::selection {
-  background-color: var(--color-primary);
-  color: var(--color-bg);
-}
-
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: var(--radius-full);
 }

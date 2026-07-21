@@ -539,22 +539,39 @@ async function pairExcludedIds(userId: string) {
   return new Set(pairs.map((pair) => pair.userAId === userId ? pair.userBId : pair.userAId));
 }
 
-function generalExperienceProximity(
+export function generalExperienceProximity(
   requester: MatchProfile,
   candidate: MatchProfile,
 ): Pick<ExploreCandidateResult, "experienceProximity" | "experienceSource"> {
+  const comparisons: Pick<ExploreCandidateResult, "experienceProximity" | "experienceSource">[] = [];
+
   if (requester.cfRating !== null && candidate.cfRating !== null) {
-    return { experienceProximity: Math.max(0, 1 - Math.abs(requester.cfRating - candidate.cfRating) / 2_000), experienceSource: "CODEFORCES" };
+    comparisons.push({
+      experienceProximity: Math.max(0, 1 - Math.abs(requester.cfRating - candidate.cfRating) / 2_000),
+      experienceSource: "CODEFORCES",
+    });
   }
   if (requester.lcRating !== null && candidate.lcRating !== null && requester.lcRating > 0 && candidate.lcRating > 0) {
-    return { experienceProximity: Math.max(0, 1 - Math.abs(requester.lcRating - candidate.lcRating) / Math.max(requester.lcRating, candidate.lcRating)), experienceSource: "LEETCODE" };
+    comparisons.push({
+      experienceProximity: Math.max(0, 1 - Math.abs(requester.lcRating - candidate.lcRating) / Math.max(requester.lcRating, candidate.lcRating)),
+      experienceSource: "LEETCODE",
+    });
   }
   const requestTier = githubExperienceTier(requester);
   const candidateTier = githubExperienceTier(candidate);
   if (requester.github.usable && candidate.github.usable && requestTier !== null && candidateTier !== null) {
-    return { experienceProximity: Math.max(0, 1 - Math.abs(requestTier - candidateTier) / 3), experienceSource: "GITHUB" };
+    comparisons.push({
+      experienceProximity: Math.max(0, 1 - Math.abs(requestTier - candidateTier) / 3),
+      experienceSource: "GITHUB",
+    });
   }
-  return { experienceProximity: 0, experienceSource: "UNKNOWN" };
+
+  // Evaluate every shared signal and surface the closest one. `>` preserves
+  // the deterministic CF → LeetCode → GitHub order when scores are tied.
+  return comparisons.reduce<Pick<ExploreCandidateResult, "experienceProximity" | "experienceSource">>(
+    (best, comparison) => comparison.experienceProximity > best.experienceProximity ? comparison : best,
+    { experienceProximity: 0, experienceSource: "UNKNOWN" },
+  );
 }
 
 export function compareExploreCandidates(left: ExploreCandidateResult, right: ExploreCandidateResult) {
@@ -627,6 +644,7 @@ async function rankCandidates(
     ordered.push({
       ...candidate,
       ...evaluated.snapshot,
+      ...generalExperienceProximity(requester, candidate),
       levelBand: levelBand(evaluated.snapshot.compatibility),
     });
   }

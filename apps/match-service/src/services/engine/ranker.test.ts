@@ -4,7 +4,7 @@ import {
   buildSkillVector,
   type IntentConfiguration,
 } from "@devmatch/shared";
-import { compareCandidateResults, compareExploreCandidates, evaluateRecommendation } from "./ranker";
+import { compareCandidateResults, compareExploreCandidates, evaluateRecommendation, generalExperienceProximity } from "./ranker";
 import type { CandidateResult, ExploreCandidateResult, MatchProfile, RecommendationSnapshot } from "./types";
 
 const metadata = {
@@ -206,6 +206,8 @@ describe("intent-specific matching", () => {
       ...baseSnapshot,
       userId: "high",
       levelBand: "NEAR",
+      experienceProximity: 0.9,
+      experienceSource: "CODEFORCES",
     } satisfies CandidateResult;
     const medium = {
       ...high,
@@ -243,5 +245,25 @@ describe("Explore ordering", () => {
     ];
     expect(candidates.sort(compareExploreCandidates).map((candidate) => candidate.userId))
       .toEqual(["similar", "skills", "a", "z"]);
+  });
+});
+
+describe("general experience proximity", () => {
+  it("chooses the strongest shared platform signal", () => {
+    const requester = profile("requester", dsa(), {
+      cfRating: 1500,
+      lcRating: 10_000,
+      github: { connected: true, usable: true, contributionsLastYear: 250, activeWeeksLastYear: 30, stars: 20, topics: [], lastSyncedAt: null },
+    });
+    const candidate = profile("candidate", dsa(), {
+      cfRating: 500,
+      lcRating: 8_000,
+      github: { connected: true, usable: true, contributionsLastYear: 20, activeWeeksLastYear: 5, stars: 0, topics: [], lastSyncedAt: null },
+    });
+
+    expect(generalExperienceProximity(requester, candidate)).toEqual({
+      experienceProximity: 0.8,
+      experienceSource: "LEETCODE",
+    });
   });
 });

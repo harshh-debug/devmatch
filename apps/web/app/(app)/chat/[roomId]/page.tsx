@@ -132,9 +132,9 @@ export default function ChatRoomPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] lg:h-screen">
+    <div className="flex h-[calc(100vh-5rem)] px-3 pb-3 lg:h-screen lg:p-3">
       {/* Chat list sidebar (desktop) */}
-      <div className="hidden lg:flex lg:w-72 xl:w-80 border-r border-border flex-col">
+      <div className="hidden overflow-hidden rounded-[1.5rem] border border-white/12 bg-surface lg:flex lg:w-72 lg:flex-col xl:w-80">
         <div className="p-4 border-b border-border">
           <h1 className="font-display font-semibold text-[18px] text-ink tracking-tight">
             Chat
@@ -153,9 +153,9 @@ export default function ChatRoomPage() {
       </div>
 
       {/* Active conversation */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="ml-0 flex min-w-0 flex-1 flex-col overflow-hidden rounded-[1.5rem] border border-white/12 bg-bg lg:ml-3">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border bg-bg">
+        <div className="flex items-center justify-between border-b border-white/10 bg-surface px-4 py-3.5 sm:px-5">
           <div className="flex items-center gap-3 min-w-0">
             {/* Mobile back */}
             <Link
@@ -230,7 +230,7 @@ export default function ChatRoomPage() {
         )}
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4 space-y-3">
+        <div className="flex-1 space-y-3 overflow-y-auto px-4 py-5 sm:px-5">
           {messages.map((msg: ChatMessage) => {
             const isMe = msg.senderId === myUserId || msg.senderId === "__me__";
             return (
@@ -305,7 +305,7 @@ export default function ChatRoomPage() {
         </div>
 
         {/* Input area */}
-        <div className="border-t border-border p-3 sm:p-4 bg-bg">
+        <div className="border-t border-white/10 bg-surface p-3 sm:p-4">
           <div className="flex items-end gap-2 max-w-4xl mx-auto">
             <div className="flex-1 relative">
               {isCodeMode && (
@@ -320,7 +320,7 @@ export default function ChatRoomPage() {
                 onChange={(e) => handleInputChange(e.target.value)}
                 placeholder={isCodeMode ? "Paste a code snippet..." : "Type a message..."}
                 rows={isCodeMode ? 4 : 1}
-                className="w-full px-3.5 py-2.5 text-[14px] bg-surface border border-border rounded-xl text-ink placeholder:text-muted/60 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring transition-colors duration-fast resize-none font-mono"
+                className="w-full resize-none rounded-xl border border-white/15 bg-bg px-3.5 py-2.5 font-mono text-[14px] text-ink placeholder:text-muted/60 transition-colors duration-fast focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey && !isCodeMode) {
                     e.preventDefault();

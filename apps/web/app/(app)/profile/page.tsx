@@ -133,19 +133,21 @@ export default function ProfilePage() {
     if (college) score += 15;
     if (selectedSkills.length >= 3) score += 20;
     else if (selectedSkills.length > 0) score += 10;
-    if (githubHandle) score += 12.5;
-    if (leetcodeHandle) score += 12.5;
+    if (githubHandle) score += 10;
+    if (leetcodeHandle) score += 7.5;
+    if (codeforcesHandle) score += 7.5;
     return Math.round(score);
   };
 
   const completeness = profileCompleteness();
   const missingFields = [];
-  if (!displayName) missingFields.push({ label: "Add your name", pts: 20, fieldId: "displayName" });
-  if (!bio) missingFields.push({ label: "Add a bio", pts: 20, fieldId: "bio" });
-  if (!college) missingFields.push({ label: "Add your college", pts: 15, fieldId: "college" });
-  if (selectedSkills.length < 3) missingFields.push({ label: "Add 3+ skills", pts: 20, fieldId: "searchSkill" });
-  if (!githubHandle) missingFields.push({ label: "Connect GitHub", pts: 12.5, fieldId: "githubHandle" });
-  if (!leetcodeHandle) missingFields.push({ label: "Connect LeetCode", pts: 12.5, fieldId: "leetcodeHandle" });
+  if (!displayName) missingFields.push({ label: "Add your name", pts: 20, href: "/settings#displayName" });
+  if (!bio) missingFields.push({ label: "Add a bio", pts: 20, href: "/settings#bio" });
+  if (!college) missingFields.push({ label: "Add your college", pts: 15, href: "/settings#college" });
+  if (selectedSkills.length < 3) missingFields.push({ label: "Add 3+ skills", pts: 20, href: "/profile#skills" });
+  if (!githubHandle) missingFields.push({ label: "Connect GitHub", pts: 10, href: "/settings#githubHandle" });
+  if (!leetcodeHandle) missingFields.push({ label: "Connect LeetCode", pts: 7.5, href: "/settings#leetcodeHandle" });
+  if (!codeforcesHandle) missingFields.push({ label: "Connect Codeforces", pts: 7.5, href: "/settings#codeforcesHandle" });
 
 
   const invalidate = () => {
@@ -155,16 +157,11 @@ export default function ProfilePage() {
   };
 
   const saveProfile = useMutation({
-    mutationFn: () =>
+    mutationFn: (body: Record<string, string>) =>
       apiFetch("/users/me", {
         token,
         method: "PATCH",
-        body: {
-          username,
-          displayName,
-          bio,
-          college,
-        },
+        body,
       }),
     onError: (err) =>
       setError(err instanceof ApiError ? err.message : "Could not save profile."),
@@ -186,7 +183,24 @@ export default function ProfilePage() {
   function handleSave() {
     setError(null);
     setSavedMsg(null);
-    Promise.all([saveProfile.mutateAsync(), saveSkills.mutateAsync()])
+    const profileChanges: Record<string, string> = {};
+    if (username !== (profileData?.username ?? "")) profileChanges.username = username;
+    if (displayName !== (profileData?.displayName ?? "")) profileChanges.displayName = displayName;
+    if (bio !== (profileData?.bio ?? "")) profileChanges.bio = bio;
+    if (college !== (profileData?.college ?? "")) profileChanges.college = college;
+
+    const savedSkills = profileData?.skillTags ?? [];
+    const skillsChanged = selectedSkills.join("\u0000") !== savedSkills.join("\u0000");
+    const saves: Promise<unknown>[] = [];
+    if (Object.keys(profileChanges).length > 0) saves.push(saveProfile.mutateAsync(profileChanges));
+    if (skillsChanged) saves.push(saveSkills.mutateAsync());
+
+    if (saves.length === 0) {
+      setSavedMsg("No changes to save.");
+      return;
+    }
+
+    Promise.all(saves)
       .then(() => {
         invalidate();
         setSavedMsg("Profile saved.");
@@ -266,10 +280,10 @@ export default function ProfilePage() {
 
   if (!isSettings) {
     return (
-      <div className="max-w-[800px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        <div className="flex items-center gap-3"><div className="w-12 h-12 rounded-full bg-ink/10 flex items-center justify-center text-sm font-semibold overflow-hidden">{profileData?.avatarUrl ? <img src={profileData.avatarUrl} alt="" className="w-full h-full object-cover" /> : (displayName[0] ?? "U")}</div><div><h1 className="font-display font-semibold text-[24px] text-ink tracking-tight">Profile</h1><p className="text-[13px] text-muted mt-1">Your synced developer profile.</p></div></div>
+      <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6 sm:py-10">
+        <div className="flex items-center gap-4 rounded-[1.5rem] border border-white/12 bg-surface px-5 py-5 sm:px-6"><div className="flex size-12 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-semibold text-bg">{profileData?.avatarUrl ? <img src={profileData.avatarUrl} alt="" className="w-full h-full object-cover" /> : (displayName[0] ?? "U")}</div><div><h1 className="font-display text-3xl font-semibold tracking-[-0.06em] text-ink">Profile</h1><p className="mt-1 text-[14px] text-muted">Your synced developer profile.</p></div></div>
         <CompletenessWidget completeness={completeness} missingFields={missingFields} />
-        <section className="bg-bg border border-border rounded-xl p-5">
+        <section id="skills" className="rounded-[1.35rem] border border-white/12 bg-surface p-5 shadow-sm sm:p-6">
           <h2 className="text-[13px] font-medium text-ink mb-3">Skills</h2>
           <div className="flex flex-wrap gap-1.5 mb-3">{selectedSkills.map((skill) => <button key={skill} onClick={() => removeSkill(skill)} className="px-2.5 py-1 text-[12px] rounded-full bg-primary/10 text-primary border border-primary/20">{skill} ×</button>)}</div>
           <div className="relative"><input id="searchSkill" value={searchSkill} onChange={(event) => { setSearchSkill(event.target.value); setShowSkillDropdown(true); }} onFocus={() => setShowSkillDropdown(true)} placeholder="Add a skill…" className="w-full px-3.5 py-2 text-[13px] bg-bg border border-border rounded-lg text-ink focus:outline-none focus:border-ring" />{showSkillDropdown && filteredSkills.length > 0 && <div className="absolute z-dropdown left-0 right-0 top-full mt-1 bg-bg border border-border rounded-lg shadow-lg overflow-hidden">{filteredSkills.map((skill) => <button key={skill} onClick={() => addSkill(skill)} className="w-full text-left px-3 py-2 text-[12px] hover:bg-surface">{skill}</button>)}</div>}</div>
@@ -278,8 +292,8 @@ export default function ProfilePage() {
         {profileData && <div className="space-y-4">
           <GitHubActivity profile={profileData} />
           <div className="grid sm:grid-cols-2 gap-4">
-            <section className="bg-bg border border-border rounded-xl p-5"><h2 className="text-[13px] font-medium text-ink">LeetCode</h2><p className="text-[12px] text-muted mt-1">{leetcodeHandle ? `@${leetcodeHandle}` : "Not connected"}</p><div className="grid grid-cols-2 gap-3 mt-4"><div><p className="text-[10px] text-muted">GLOBAL RANK</p><p className="font-mono text-[18px] text-ink">{profileData.lcRating ?? "—"}</p></div><div><p className="text-[10px] text-muted">SOLVED</p><p className="font-mono text-[18px] text-ink">{profileData.lcTotalSolved ?? "—"}</p></div></div>{!leetcodeHandle && <a href="/settings#leetcodeHandle" className="inline-block mt-4 text-[12px] text-primary">Connect LeetCode</a>}</section>
-            <section className="bg-bg border border-border rounded-xl p-5"><h2 className="text-[13px] font-medium text-ink">Codeforces</h2><p className="text-[12px] text-muted mt-1">{codeforcesHandle ? `@${codeforcesHandle}` : "Not connected"}</p><div className="grid grid-cols-2 gap-3 mt-4"><div><p className="text-[10px] text-muted">RATING</p><p className="font-mono text-[18px] text-ink">{profileData.cfRating ?? "—"}</p></div><div><p className="text-[10px] text-muted">HANDLE</p><p className="font-mono text-[13px] text-ink truncate">{codeforcesHandle || "—"}</p></div></div>{!codeforcesHandle && <a href="/settings#codeforcesHandle" className="inline-block mt-4 text-[12px] text-primary">Connect Codeforces</a>}</section>
+            <section className="rounded-[1.35rem] border border-white/12 bg-surface p-5 shadow-sm"><h2 className="text-[13px] font-medium text-ink">LeetCode</h2><p className="text-[12px] text-muted mt-1">{leetcodeHandle ? `@${leetcodeHandle}` : "Not connected"}</p><div className="grid grid-cols-2 gap-3 mt-4"><div><p className="text-[10px] text-muted">GLOBAL RANK</p><p className="font-mono text-[18px] text-ink">{profileData.lcRating ?? "—"}</p></div><div><p className="text-[10px] text-muted">SOLVED</p><p className="font-mono text-[18px] text-ink">{profileData.lcTotalSolved ?? "—"}</p></div></div>{!leetcodeHandle && <a href="/settings#leetcodeHandle" className="inline-block mt-4 text-[12px] text-primary">Connect LeetCode</a>}</section>
+            <section className="rounded-[1.35rem] border border-white/12 bg-surface p-5 shadow-sm"><h2 className="text-[13px] font-medium text-ink">Codeforces</h2><p className="text-[12px] text-muted mt-1">{codeforcesHandle ? `@${codeforcesHandle}` : "Not connected"}</p><div className="grid grid-cols-2 gap-3 mt-4"><div><p className="text-[10px] text-muted">RATING</p><p className="font-mono text-[18px] text-ink">{profileData.cfRating ?? "—"}</p></div><div><p className="text-[10px] text-muted">HANDLE</p><p className="font-mono text-[13px] text-ink truncate">{codeforcesHandle || "—"}</p></div></div>{!codeforcesHandle && <a href="/settings#codeforcesHandle" className="inline-block mt-4 text-[12px] text-primary">Connect Codeforces</a>}</section>
           </div>
         </div>}
       </div>
@@ -287,13 +301,13 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="max-w-[800px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="font-display font-semibold text-[24px] text-ink tracking-tight">
+      <div className="mb-8 rounded-[1.5rem] border border-white/12 bg-surface px-5 py-5 sm:px-6">
+        <h1 className="font-display text-3xl font-semibold tracking-[-0.06em] text-ink">
           Settings
         </h1>
-        <p className="text-[13px] text-muted mt-0.5">
+        <p className="mt-1 text-[14px] text-muted">
           Edit your identity, skills, and connected accounts
         </p>
       </div>

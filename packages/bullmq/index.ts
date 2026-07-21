@@ -26,4 +26,17 @@ export const profileSyncQueue = new Queue<SyncJobPayload>(QUEUES.PROFILE_SYNC, {
     }
 });
 
+/**
+ * Queue at most one in-flight sync for a user/platform pair. Completed and
+ * permanently failed jobs are removed so a later manual or stale refresh can
+ * be scheduled with the same id.
+ */
+export async function enqueueProfileSync(payload: SyncJobPayload) {
+  return profileSyncQueue.add(payload.platform, payload, {
+    jobId: `profile-sync-${payload.userId}-${payload.platform}`,
+    removeOnComplete: true,
+    removeOnFail: true,
+  });
+}
+
 export * from 'bullmq';

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -33,9 +33,10 @@ interface Candidate {
   college: string | null;
   cfRating: number | null;
   lcRating?: number | null;
-  profileScore: number;
   skillTags?: string[];
   technicalFitScore: number;
+  experienceProximity: number;
+  experienceSource: ExploreCandidate["experienceSource"];
   similarityScore: number;
   compatibility: Compatibility;
   levelSource: LevelSource;
@@ -84,6 +85,13 @@ const COMPATIBILITY_LABELS: Record<Compatibility, string> = {
   UNKNOWN: "Level data unavailable",
 };
 
+const EXPLORE_EXPERIENCE_SOURCE_LABELS: Record<ExploreCandidate["experienceSource"], string> = {
+  CODEFORCES: "Based on Codeforces ratings",
+  LEETCODE: "Based on LeetCode global ranks",
+  GITHUB: "Based on GitHub activity",
+  UNKNOWN: "No comparable experience signal",
+};
+
 function DiscoverLoader({ intent }: { intent: string }) {
   return (
     <div className="w-full rounded-xl border border-border bg-black p-8">
@@ -107,7 +115,7 @@ function CandidateCard({
   actionPending: boolean;
 }) {
   return (
-    <div className="group relative bg-bg border border-border rounded-xl p-4 sm:p-5 hover:border-ink/20 transition-colors">
+    <div className="group relative rounded-[1.35rem] border border-white/12 bg-surface p-5 shadow-sm transition duration-500 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-xl hover:shadow-black/20 sm:p-6">
       <Link href={`/u/${candidate.userId}`} className="flex items-start gap-3.5 rounded-lg">
         <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 bg-ink/10 text-ink overflow-hidden">
           {candidate.avatarUrl ? (
@@ -147,7 +155,7 @@ function CandidateCard({
           <div className="mt-3 pt-3 border-t border-border">
             <p className={`text-[12px] font-medium ${candidate.compatibility === "UNKNOWN" ? "text-muted" : "text-ink"}`}>
               {COMPATIBILITY_LABELS[candidate.compatibility]}
-              <span className="text-muted font-normal"> · {Math.round(candidate.technicalFitScore * 100)}% technical fit</span>
+              <span className="text-muted font-normal"> · Technical fit {Math.round(candidate.technicalFitScore * 100)}% (skills and intent requirements)</span>
             </p>
             {candidate.resolvedMatchMode !== "DIRECT" && (
               <p className="mt-1 text-[11px] text-muted">
@@ -159,30 +167,32 @@ function CandidateCard({
                 {[...candidate.matchedRoles, ...candidate.matchedGoals, ...candidate.matchedContributionTypes].join(" · ").replaceAll("_", " ")}
               </p>
             )}
-            <div className="flex items-center gap-4 mt-2">
+            <div className="mt-2 space-y-1 text-[10px] text-muted">
+              <p>Experience match <span className="font-mono text-ink">{Math.round(candidate.experienceProximity * 100)}%</span> · {EXPLORE_EXPERIENCE_SOURCE_LABELS[candidate.experienceSource]}</p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
               {candidate.cfRating !== null && (
                 <p className="text-[10px] text-muted">CF <span className="font-mono text-ink">{candidate.cfRating}</span></p>
               )}
-              {candidate.lcRating && (
+              {candidate.lcRating !== null && candidate.lcRating !== undefined && (
                 <p className="text-[10px] text-muted">LC rank <span className="font-mono text-ink">{candidate.lcRating}</span></p>
               )}
-              <p className="text-[10px] text-muted">Profile <span className="font-mono text-ink">{candidate.profileScore}</span></p>
+              </div>
             </div>
           </div>
         </div>
       </Link>
-      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border">
+      <div className="mt-5 flex items-center gap-2 border-t border-white/10 pt-4">
         <button
           onClick={() => onAction(candidate.userId, "REJECTED")}
           disabled={actionPending}
-          className="flex-1 py-2 text-[12px] font-medium rounded-lg border border-border text-muted hover:text-ink disabled:opacity-50"
+          className="flex-1 rounded-xl border border-white/15 py-2.5 text-[12px] font-medium text-muted transition hover:border-white/30 hover:text-ink disabled:opacity-50"
         >
           Skip
         </button>
         <button
           onClick={() => onAction(candidate.userId, "ACCEPTED")}
           disabled={actionPending}
-          className="flex-1 py-2 text-[12px] font-medium rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-50"
+          className="flex-1 rounded-xl bg-primary py-2.5 text-[12px] font-semibold text-bg transition hover:bg-primary-hover disabled:opacity-50"
         >
           Connect
         </button>
@@ -201,7 +211,7 @@ function ExploreCard({
   actionPending: boolean;
 }) {
   return (
-    <div className="group relative bg-bg border border-border rounded-xl p-4 sm:p-5 hover:border-ink/20 transition-colors">
+    <div className="group relative rounded-[1.35rem] border border-white/12 bg-surface p-5 shadow-sm transition duration-500 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-xl hover:shadow-black/20 sm:p-6">
       <Link href={`/u/${candidate.userId}`} className="flex items-start gap-3.5 rounded-lg">
         <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 bg-ink/10 text-ink overflow-hidden">
           {candidate.avatarUrl ? <Image src={candidate.avatarUrl} alt={candidate.displayName ?? "Developer"} width={40} height={40} unoptimized className="w-full h-full object-cover" /> : candidate.displayName?.charAt(0) || "U"}
@@ -214,17 +224,21 @@ function ExploreCard({
           </div>
           {candidate.sharedSkills.length > 0 && <div className="flex flex-wrap gap-1.5 mt-2">{candidate.sharedSkills.slice(0, 5).map((skill) => <span key={skill} className="px-2 py-0.5 text-[10px] rounded-full border border-border text-muted">{skill}</span>)}</div>}
           <div className="mt-3 pt-3 border-t border-border">
-            <p className="text-[12px] font-medium text-ink">{Math.round(candidate.similarityScore * 100)}% profile similarity <span className="font-normal text-muted">· {candidate.sharedSkillCount} shared skill{candidate.sharedSkillCount === 1 ? "" : "s"}</span></p>
-            <div className="flex items-center gap-4 mt-2 text-[10px] text-muted">
-              <p>Experience <span className="font-mono text-ink">{Math.round(candidate.experienceProximity * 100)}%</span></p>
-              <p>Profile <span className="font-mono text-ink">{candidate.profileScore}</span></p>
+            <p className="text-[12px] font-medium text-ink">{Math.round(candidate.similarityScore * 100)}% profile similarity <span className="font-normal text-muted">(shared skills and technical profile)</span></p>
+            <p className="mt-1 text-[10px] text-muted">{candidate.sharedSkillCount} shared skill{candidate.sharedSkillCount === 1 ? "" : "s"}</p>
+            <div className="mt-2 space-y-1 text-[10px] text-muted">
+              <p>Experience match <span className="font-mono text-ink">{Math.round(candidate.experienceProximity * 100)}%</span> · {EXPLORE_EXPERIENCE_SOURCE_LABELS[candidate.experienceSource]}</p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                {candidate.cfRating !== null && <p>CF <span className="font-mono text-ink">{candidate.cfRating}</span></p>}
+                {candidate.lcRating !== null && <p>LC rank <span className="font-mono text-ink">{candidate.lcRating}</span></p>}
+              </div>
             </div>
           </div>
         </div>
       </Link>
-      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border">
-        <button onClick={() => onAction(candidate.userId, "REJECTED")} disabled={actionPending} className="flex-1 py-2 text-[12px] font-medium rounded-lg border border-border text-muted hover:text-ink disabled:opacity-50">Skip</button>
-        <button onClick={() => onAction(candidate.userId, "ACCEPTED")} disabled={actionPending} className="flex-1 py-2 text-[12px] font-medium rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-50">Connect</button>
+      <div className="mt-5 flex items-center gap-2 border-t border-white/10 pt-4">
+        <button onClick={() => onAction(candidate.userId, "REJECTED")} disabled={actionPending} className="flex-1 rounded-xl border border-white/15 py-2.5 text-[12px] font-medium text-muted transition hover:border-white/30 hover:text-ink disabled:opacity-50">Skip</button>
+        <button onClick={() => onAction(candidate.userId, "ACCEPTED")} disabled={actionPending} className="flex-1 rounded-xl bg-primary py-2.5 text-[12px] font-semibold text-bg transition hover:bg-primary-hover disabled:opacity-50">Connect</button>
       </div>
     </div>
   );
@@ -242,6 +256,7 @@ function DiscoverPageInner() {
   const [explorePage, setExplorePage] = useState(1);
   const [forYouCandidates, setForYouCandidates] = useState<Candidate[]>([]);
   const [exploreCandidates, setExploreCandidates] = useState<ExploreCandidate[]>([]);
+  const previousIntentRevision = useRef<number | undefined>(undefined);
 
   const { data: intentState } = useQuery({
     queryKey: ["users", "me", "intents"],
@@ -282,8 +297,20 @@ function DiscoverPageInner() {
   }, [exploreQuery.data, explorePage]);
 
   useEffect(() => {
-    setForYouPage(1);
-    setForYouCandidates([]);
+    const revision = intentState?.revision;
+    if (revision === undefined) return;
+
+    // Cached candidate data is available immediately when the user returns to
+    // Discover. Do not erase that restored list on this component's first
+    // mount; only reset pagination after a real intent-preference revision.
+    if (
+      previousIntentRevision.current !== undefined &&
+      previousIntentRevision.current !== revision
+    ) {
+      setForYouPage(1);
+      setForYouCandidates([]);
+    }
+    previousIntentRevision.current = revision;
   }, [intentState?.revision]);
 
   const response = tab === "foryou" ? candidateQuery.data : exploreQuery.data;
@@ -330,7 +357,7 @@ function DiscoverPageInner() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
       {matchNotification && (
         <div className="fixed top-4 right-4 z-50 bg-primary text-white px-4 py-3 rounded-xl text-[13px] font-medium shadow-lg">
           {matchNotification}
@@ -338,18 +365,18 @@ function DiscoverPageInner() {
       )}
       {showIntentModal && <IntentModal initialIntent={activeIntent ?? undefined} onClose={() => setShowIntentModal(false)} />}
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="mb-6 flex flex-col justify-between gap-5 rounded-[1.5rem] border border-white/12 bg-surface px-5 py-5 sm:flex-row sm:items-center sm:px-6">
         <div>
-          <h1 className="font-display font-semibold text-[24px] text-ink tracking-tight">Discover</h1>
-          <p className="text-[13px] text-muted mt-0.5">Find developers who match your goals.</p>
+          <h1 className="font-display text-3xl font-semibold tracking-[-0.06em] text-ink">Discover</h1>
+          <p className="mt-1 text-[14px] text-muted">Find developers who match your goals.</p>
         </div>
-        <div className="flex items-center gap-1 bg-surface border border-border rounded-lg p-1">
+        <div className="flex items-center gap-1 rounded-xl border border-white/12 bg-bg p-1.5">
           {(["foryou", "explore"] as const).map((value) => (
             <button
               key={value}
               onClick={() => switchTab(value)}
-              className={`px-4 py-1.5 rounded-md text-[12px] font-medium ${
-                tab === value ? "bg-bg text-ink shadow-sm border border-border" : "text-muted hover:text-ink"
+              className={`rounded-lg px-4 py-2 text-[12px] font-medium transition ${
+                tab === value ? "border border-white/15 bg-surface-raised text-ink shadow-sm" : "text-muted hover:text-ink"
               }`}
             >
               {value === "foryou" ? "For You" : "Explore"}
@@ -367,9 +394,9 @@ function DiscoverPageInner() {
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-2">
         {tab === "foryou" && !activeIntent && !isFetching && (
-          <div className="text-center py-16 bg-bg border border-border rounded-xl">
+          <div className="col-span-full rounded-[1.5rem] border border-white/12 bg-surface py-16 text-center">
             <h3 className="text-ink font-medium mb-1">Set an intent to find matches</h3>
             <p className="text-muted text-[13px] mb-4">Tell us what you are looking for right now.</p>
             <button onClick={() => setShowIntentModal(true)} className="px-6 py-2.5 bg-primary text-white rounded-lg text-[13px] font-medium">
@@ -379,7 +406,7 @@ function DiscoverPageInner() {
         )}
         {isFetching && (tab === "explore" || activeIntent) && <DiscoverLoader intent={tab === "explore" ? "profile" : INTENT_LABELS[activeIntent!]} />}
         {!isFetching && tab === "foryou" && activeIntent && (candidates as Candidate[]).map((candidate) => (
-          <div key={candidate.userId} className="space-y-4">
+          <div key={candidate.userId}>
             <CandidateCard
               candidate={candidate}
               activeIntent={activeIntent}
@@ -390,7 +417,7 @@ function DiscoverPageInner() {
         ))}
         {!isFetching && tab === "explore" && (candidates as ExploreCandidate[]).map((candidate) => <ExploreCard key={candidate.userId} candidate={candidate} onAction={(targetId, action) => actionMutation.mutate({ targetId, action, connectionContext: "GENERAL" })} actionPending={actionMutation.isPending} />)}
         {!isFetching && (tab === "explore" || activeIntent) && candidates.length === 0 && (
-          <div className="text-center py-12 bg-bg border border-border rounded-xl">
+          <div className="col-span-full rounded-[1.5rem] border border-white/12 bg-surface py-12 text-center">
             <h3 className="text-ink font-medium">
               {queryError ? "Matching preferences need attention" : tab === "explore" ? "No developers to explore right now" : "No developers satisfy the required preferences"}
             </h3>
@@ -403,7 +430,7 @@ function DiscoverPageInner() {
           </div>
         )}
         {!isFetching && response && candidates.length < response.totalAvailable && (
-          <button onClick={() => tab === "foryou" ? setForYouPage((page) => page + 1) : setExplorePage((page) => page + 1)} className="w-full py-2.5 text-[13px] font-medium rounded-lg border border-border text-ink hover:bg-surface">
+          <button onClick={() => tab === "foryou" ? setForYouPage((page) => page + 1) : setExplorePage((page) => page + 1)} className="col-span-full w-full rounded-xl border border-white/15 py-3 text-[13px] font-medium text-ink transition hover:border-primary/50 hover:bg-surface">
             Load more
           </button>
         )}
