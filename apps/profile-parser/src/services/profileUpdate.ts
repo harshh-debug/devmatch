@@ -36,10 +36,13 @@ export const profileUpdater = {
         ]);
         const githubTopics = skillTagMapper.normalizeTags(fetchedData.inferredTopics);
         
-        const mergedTags = Array.from(new Set([
+        // Re-normalize existing data too. Older profiles can contain a display
+        // label (for example "TypeScript") alongside parser output
+        // ("typescript"); both must resolve to one canonical skill.
+        const mergedTags = skillTagMapper.normalizeTags([
             ...existingProfile.skillTags, 
             ...normalizedNewTags
-        ]));
+        ]);
 
         // Rebuild the Vector with the newly merged tags and existing ratings
         const newVector = buildSkillVector({
@@ -74,9 +77,17 @@ export const profileUpdater = {
 
         if (!existingProfile) throw new Error("Profile not found");
 
-        // Rebuild the Vector with the NEW LC rating, but existing tags and CF rating
+        // LeetCode exposes accepted-problem counts per language. Persist the
+        // ranked list as source data and add only the leading language to the
+        // user's skills; using every historical language would overstate skills.
+        const skillTags = skillTagMapper.normalizeTags([
+            ...existingProfile.skillTags,
+            ...(fetchedData.mostUsedLanguage ? [fetchedData.mostUsedLanguage] : []),
+        ]);
+
+        // Rebuild the Vector with the new rating and canonicalized skills.
         const newVector = buildSkillVector({
-            skillTags: existingProfile.skillTags,
+            skillTags,
             lcRating: fetchedData.lcRating,
             cfRating: existingProfile.cfRating
         });
@@ -91,7 +102,9 @@ export const profileUpdater = {
                 lcEasySolved: fetchedData.lcEasySolved,
                 lcMediumSolved: fetchedData.lcMediumSolved,
                 lcHardSolved: fetchedData.lcHardSolved,
+                leetcodeLanguages: fetchedData.leetcodeLanguages ?? [],
                 leetcodeLastSyncedAt: new Date(),
+                skillTags,
                 skillVector: newVector,
                 lastSyncedAt: new Date(),
             }

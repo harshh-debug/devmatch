@@ -157,6 +157,7 @@ model Profile {
     lcMediumSolved      Int?
     lcHardSolved        Int?
     topLanguages       String[]
+    leetcodeLanguages  String[]  @default([])
     skillTags          String[]
     githubStars        Int       @default(0)
     contributionStreak Int       @default(0)

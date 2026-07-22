@@ -127,7 +127,7 @@ export default function PublicProfilePage() {
               {profile.avatarUrl ? <img src={profile.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" /> : initials(profile.displayName)}
             </div>
             <div className="text-center sm:text-left flex-1">
-              <h1 className="font-display text-3xl font-semibold tracking-[-0.06em] text-ink">
+              <h1 className="break-words font-display text-3xl font-semibold tracking-[-0.06em] text-ink">
                 {profile.displayName || profile.username}
               </h1>
               <p className="text-[13px] text-muted mt-0.5">{profile.college || "—"}</p>

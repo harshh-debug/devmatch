@@ -122,7 +122,7 @@ export default function LandingExperience() {
       </header>
 
       <main className="w-full max-w-full overflow-x-hidden">
-        <section className="relative isolate min-h-[850px] overflow-hidden px-5 pb-20 pt-44 sm:mx-4 sm:rounded-b-[2rem] sm:px-8 lg:min-h-[900px] lg:pt-48">
+        <section className="relative isolate min-h-[760px] overflow-hidden px-5 pb-20 pt-36 sm:mx-4 sm:min-h-[850px] sm:rounded-b-[2rem] sm:px-8 sm:pt-44 lg:min-h-[900px] lg:pt-48">
           <div className="grid-noise pointer-events-none absolute inset-0 -z-20 opacity-70" />
           <div className="aura-orbit pointer-events-none absolute -right-1/4 top-10 -z-10 size-[900px] rounded-full blur-3xl" />
           <div className="pointer-events-none absolute -bottom-1/3 -left-1/4 -z-10 h-[70%] w-[72%] rounded-full bg-primary/20 blur-[150px]" />

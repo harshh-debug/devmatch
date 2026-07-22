@@ -74,13 +74,13 @@ export default function SearchPage() {
           <div key={user.id} className="flex items-center gap-3 p-4 transition-colors hover:bg-white/[0.035] sm:p-5">
             <Link href={`/u/${user.id}`} className="flex min-w-0 flex-1 items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-ink/10 flex items-center justify-center text-xs font-semibold text-ink">
-              {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" /> : (user.displayName?.[0] ?? user.username[0]?.toUpperCase())}
+              {user.avatarUrl ? <img src={user.avatarUrl} alt="" loading="lazy" decoding="async" className="w-full h-full rounded-full object-cover" /> : (user.displayName?.[0] ?? user.username[0]?.toUpperCase())}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[14px] font-medium text-ink truncate">{user.displayName}</p>
               <p className="text-[12px] text-muted truncate">@{user.username}{user.college ? ` · ${user.college}` : ""}</p>
             </div>
-            {user.skillTags?.length ? <span className="text-[11px] text-muted">{user.skillTags.slice(0, 2).join(" · ")}</span> : null}
+            {user.skillTags?.length ? <span className="hidden text-[11px] text-muted sm:inline">{user.skillTags.slice(0, 2).join(" · ")}</span> : null}
             </Link>
             <button
               onClick={() => connectMutation.mutate(user.id)}

@@ -236,15 +236,54 @@ export const SKILL_TECHNICAL_INDICES = Array.from(
 
 /** Maps UI labels and provider-specific spellings to the matching taxonomy. */
 const SKILL_ALIASES: Record<string, string> = {
+    // Languages
     ts: 'typescript',
+    'type script': 'typescript',
     js: 'javascript',
+    'java script': 'javascript',
+    ecmascript: 'javascript',
+    es6: 'javascript',
+    py: 'python',
+    python3: 'python',
+    'python 3': 'python',
+    python2: 'python',
+    'python 2': 'python',
+    'c++': 'cpp',
+    'c ++': 'cpp',
+    'c-plus-plus': 'cpp',
+    'c plus plus': 'cpp',
+    'c#': 'csharp',
+    'c sharp': 'csharp',
+    'f#': 'fsharp',
+    'f sharp': 'fsharp',
+    'objective-c': 'objectivec',
+    'objective c': 'objectivec',
+    'visual basic': 'visualbasic',
+    golang: 'go',
+    'go lang': 'go',
+    'java se': 'java',
+    'java 8': 'java',
+    'java 11': 'java',
+
+    // Frameworks
     'node.js': 'node',
+    'node js': 'node',
     nodejs: 'node',
     express: 'node',
     reactjs: 'react',
     'react.js': 'react',
+    'react js': 'react',
     'next.js': 'nextjs',
-    'c++': 'cpp',
+    'next js': 'nextjs',
+    'next.js framework': 'nextjs',
+    'spring boot': 'spring',
+    springboot: 'spring',
+    'django rest framework': 'django',
+    'vue.js': 'vue',
+    vuejs: 'vue',
+    angularjs: 'angular',
+
+    // Domains and common provider/UI labels
     'machine learning': 'ml',
     'machine-learning': 'ml',
     'artificial intelligence': 'ml',
@@ -259,12 +298,28 @@ const SKILL_ALIASES: Record<string, string> = {
     kubernetes: 'devops',
 };
 
+/**
+ * Produces the stable identity used for a skill everywhere in the product.
+ * Provider data is not consistent about casing, Unicode, or extra whitespace,
+ * so callers must compare this value rather than a display label.
+ */
+export function normalizeSkillTag(rawTag: string | null | undefined): string | null {
+    if (typeof rawTag !== 'string') return null;
+
+    const tag = rawTag
+        .normalize('NFKC')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+
+    return tag ? (SKILL_ALIASES[tag] ?? tag) : null;
+}
+
 export function normalizeSkillTags(rawTags: readonly string[] | null | undefined): string[] {
     const normalized = new Set<string>();
     for (const rawTag of rawTags ?? []) {
-        const tag = rawTag.trim().toLowerCase();
-        if (!tag) continue;
-        normalized.add(SKILL_ALIASES[tag] ?? tag);
+        const tag = normalizeSkillTag(rawTag);
+        if (tag) normalized.add(tag);
     }
     return [...normalized];
 }

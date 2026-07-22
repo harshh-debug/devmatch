@@ -154,7 +154,7 @@ export default function AppShellLayout({
   return (
     <div className="min-h-screen bg-bg flex">
       {/* Mobile header */}
-      <div className="fixed left-3 right-3 top-3 z-sticky flex h-14 items-center justify-between rounded-2xl border border-white/15 bg-bg/95 px-4 shadow-xl shadow-black/20 backdrop-blur-xl lg:hidden">
+      <div className="fixed left-3 right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-sticky flex h-14 items-center justify-between rounded-2xl border border-white/15 bg-bg/95 px-4 shadow-xl shadow-black/20 backdrop-blur-xl lg:hidden">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="p-2 -ml-2 text-ink"
@@ -193,7 +193,7 @@ export default function AppShellLayout({
 
       {/* Desktop sidebar */}
       <aside
-        className={`fixed bottom-3 left-3 top-3 z-40 flex w-64 flex-col rounded-[1.5rem] border border-white/10 bg-[#0A0A0A] shadow-2xl shadow-black/25 transition-transform duration-normal lg:translate-x-0 ${
+        className={`fixed bottom-3 left-3 top-3 z-40 flex w-[min(16rem,calc(100vw-1.5rem))] flex-col rounded-[1.5rem] border border-white/10 bg-[#0A0A0A] shadow-2xl shadow-black/25 transition-transform duration-normal lg:w-64 lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -272,12 +272,12 @@ export default function AppShellLayout({
       )}
 
       {/* Main content area */}
-      <main className="min-h-screen flex-1 pb-16 pt-20 lg:pb-0 lg:pl-[17rem] lg:pt-0">
+      <main className="min-h-screen min-w-0 flex-1 pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-[calc(5rem+env(safe-area-inset-top))] lg:pb-0 lg:pl-[17rem] lg:pt-0">
         {children}
       </main>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed bottom-3 left-3 right-3 z-sticky flex h-16 items-center justify-around rounded-2xl border border-white/10 bg-[#0A0A0A] px-2 shadow-2xl shadow-black/30 lg:hidden">
+      <nav className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 right-3 z-sticky flex h-16 items-center justify-around rounded-2xl border border-white/10 bg-[#0A0A0A] px-2 shadow-2xl shadow-black/30 lg:hidden">
         {NAV_ITEMS.slice(0, 5).map((item) => {
           const active = isActive(item.href);
           const badge = badgeFor(item.badgeKey);

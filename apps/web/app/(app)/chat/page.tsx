@@ -30,7 +30,7 @@ function ChatRoomListItem({ room }: { room: any }) {
           }}
           aria-hidden="true"
         >
-          {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" /> : (user.displayName?.charAt(0) || "U")}
+          {user.avatarUrl ? <img src={user.avatarUrl} alt="" loading="lazy" decoding="async" className="w-full h-full rounded-full object-cover" /> : (user.displayName?.charAt(0) || "U")}
         </div>
       </div>
       <div className="flex-1 min-w-0">
@@ -63,7 +63,10 @@ export default function ChatListPage() {
     queryKey: ["chat", "rooms"],
     queryFn: () => apiFetch<any[]>("/chat/rooms", { token }),
     enabled: !!token,
-    refetchInterval: 5000, // Poll for new rooms after a match
+    // Active messages arrive over Socket.io; this only keeps room previews in
+    // sync when the user is not inside a room.
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
   });
 
   const rooms: any[] = roomsResp ?? [];
@@ -73,7 +76,7 @@ export default function ChatListPage() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-5rem)] px-3 pb-3 lg:h-screen lg:p-3">
+    <div className="flex h-[calc(100dvh-10.75rem)] min-h-[22rem] px-3 lg:h-screen lg:p-3">
       {/* Chat list sidebar */}
       <div className="flex w-full flex-col overflow-hidden rounded-[1.5rem] border border-white/12 bg-surface lg:w-80 xl:w-96">
         {/* Header */}

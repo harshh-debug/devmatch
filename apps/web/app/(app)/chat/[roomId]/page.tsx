@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useSyncExternalStore } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
@@ -8,6 +8,18 @@ import { apiFetch } from "@/lib/apiClient";
 import { useToken } from "@/hooks/useToken";
 import { useChat, type ChatMessage } from "@/hooks/useChat";
 import { useSession } from "next-auth/react";
+
+const DESKTOP_MEDIA_QUERY = "(min-width: 1024px)";
+
+function subscribeToDesktopLayout(onStoreChange: () => void) {
+  const media = window.matchMedia(DESKTOP_MEDIA_QUERY);
+  media.addEventListener("change", onStoreChange);
+  return () => media.removeEventListener("change", onStoreChange);
+}
+
+function getDesktopLayoutSnapshot() {
+  return window.matchMedia(DESKTOP_MEDIA_QUERY).matches;
+}
 
 function ChatSidebarItem({ room, active, token }: { room: any; active: boolean; token: string | undefined }) {
   const { data: user } = useQuery({
@@ -25,13 +37,21 @@ function ChatSidebarItem({ room, active, token }: { room: any; active: boolean; 
       }`}
     >
       <div className="w-9 h-9 rounded-full bg-ink/10 flex items-center justify-center text-[10px] font-semibold text-ink shrink-0">
-        {user?.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" /> : (user?.displayName?.[0] ?? user?.username?.[0] ?? "U")}
+        {user?.avatarUrl ? <img src={user.avatarUrl} alt="" loading="lazy" decoding="async" className="w-full h-full rounded-full object-cover" /> : (user?.displayName?.[0] ?? user?.username?.[0] ?? "U")}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-medium text-ink truncate">{name}</p>
         <p className="text-[11px] text-muted truncate">{room.lastMessage?.content ?? "No messages yet"}</p>
       </div>
     </Link>
+  );
+}
+
+function useDesktopLayout() {
+  return useSyncExternalStore(
+    subscribeToDesktopLayout,
+    getDesktopLayoutSnapshot,
+    () => false,
   );
 }
 
@@ -45,13 +65,16 @@ export default function ChatRoomPage() {
   const [isCodeMode, setIsCodeMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTypingRef = useRef(false);
+  const isDesktop = useDesktopLayout();
 
   // ── REST: room list (sidebar) ──────────────────────────────────
   const { data: roomsResp } = useQuery({
     queryKey: ["chat", "rooms"],
     queryFn: () => apiFetch<any[]>("/chat/rooms", { token }),
     enabled: !!token,
-    refetchInterval: 5000,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
   });
 
   const rooms: any[] = roomsResp ?? [];
@@ -109,8 +132,16 @@ export default function ChatRoomPage() {
 
   // Auto-scroll to latest message.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    const frame = requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [messages.length]);
+
+  useEffect(() => () => {
+    if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+    if (isTypingRef.current) sendTyping(false);
+  }, [sendTyping]);
 
   // ── Send ───────────────────────────────────────────────────────
   const handleSend = useCallback(() => {
@@ -118,23 +149,29 @@ export default function ChatRoomPage() {
     if (!trimmed) return;
     sendMessage(trimmed, isCodeMode ? "CODE_SNIPPET" : "TEXT");
     setInput("");
-    // Stop typing indicator.
-    sendTyping(false);
+    if (isTypingRef.current) sendTyping(false);
+    isTypingRef.current = false;
     if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
   }, [input, isCodeMode, sendMessage, sendTyping]);
 
   // ── Typing indicator ───────────────────────────────────────────
   const handleInputChange = (val: string) => {
     setInput(val);
-    sendTyping(true);
+    if (!isTypingRef.current) {
+      sendTyping(true);
+      isTypingRef.current = true;
+    }
     if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
-    typingDebounceRef.current = setTimeout(() => sendTyping(false), 3000);
+    typingDebounceRef.current = setTimeout(() => {
+      sendTyping(false);
+      isTypingRef.current = false;
+    }, 3000);
   };
 
   return (
-    <div className="flex h-[calc(100vh-5rem)] px-3 pb-3 lg:h-screen lg:p-3">
+    <div className="flex h-[calc(100dvh-10.75rem)] min-h-[22rem] px-3 lg:h-screen lg:p-3">
       {/* Chat list sidebar (desktop) */}
-      <div className="hidden overflow-hidden rounded-[1.5rem] border border-white/12 bg-surface lg:flex lg:w-72 lg:flex-col xl:w-80">
+      {isDesktop && <div className="hidden overflow-hidden rounded-[1.5rem] border border-white/12 bg-surface lg:flex lg:w-72 lg:flex-col xl:w-80">
         <div className="p-4 border-b border-border">
           <h1 className="font-display font-semibold text-[18px] text-ink tracking-tight">
             Chat
@@ -150,7 +187,7 @@ export default function ChatRoomPage() {
             />
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* Active conversation */}
       <div className="ml-0 flex min-w-0 flex-1 flex-col overflow-hidden rounded-[1.5rem] border border-white/12 bg-bg lg:ml-3">
@@ -176,7 +213,7 @@ export default function ChatRoomPage() {
                 }}
                 aria-hidden="true"
               >
-                {OTHER_USER.avatarUrl ? <img src={OTHER_USER.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" /> : (OTHER_USER.displayName?.[0] ?? "U")}
+                {OTHER_USER.avatarUrl ? <img src={OTHER_USER.avatarUrl} alt="" decoding="async" className="w-full h-full rounded-full object-cover" /> : (OTHER_USER.displayName?.[0] ?? "U")}
               </div>
               {(peerOnline || OTHER_USER.online) && (
                 <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-success border-2 border-bg" />
@@ -332,7 +369,7 @@ export default function ChatRoomPage() {
             <div className="flex items-center gap-1.5 pb-0.5">
               <button
                 onClick={() => setIsCodeMode(!isCodeMode)}
-                className={`p-2 rounded-lg transition-colors duration-fast ${
+                className={`grid size-10 place-items-center rounded-lg transition-colors duration-fast ${
                   isCodeMode
                     ? "bg-primary/10 text-primary"
                     : "text-muted hover:text-ink hover:bg-surface"
@@ -348,7 +385,7 @@ export default function ChatRoomPage() {
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || !connected}
-                className="p-2 rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast disabled:opacity-40 disabled:cursor-not-allowed"
+                className="grid size-10 place-items-center rounded-lg bg-primary text-white transition-colors duration-fast hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Send message"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

@@ -9,29 +9,40 @@ import type { UserProfile } from "@/lib/types";
 import { CompletenessWidget } from "@/app/components/profile/CompletenessWidget";
 import { GitHubActivity } from "@/app/components/profile/GitHubActivity";
 import { IntentSettings } from "@/app/components/profile/IntentSettings";
+import { normalizeSkillTag, normalizeSkillTags } from "@devmatch/shared";
 
 const SKILLS_POOL = [
-  "TypeScript",
-  "React",
-  "Next.js",
-  "Node.js",
-  "Python",
-  "Rust",
-  "Go",
-  "Postgres",
-  "Docker",
-  "Kubernetes",
-  "AWS",
-  "TensorFlow",
-  "PyTorch",
-  "Tailwind",
-  "GraphQL",
-  "gRPC",
-  "Redis",
-  "MongoDB",
-  "C++",
-  "Java",
-];
+  { label: "TypeScript", value: "typescript" },
+  { label: "React", value: "react" },
+  { label: "Next.js", value: "nextjs" },
+  { label: "Node.js", value: "node" },
+  { label: "Python", value: "python" },
+  { label: "Rust", value: "rust" },
+  { label: "Go", value: "go" },
+  { label: "PostgreSQL", value: "postgres" },
+  { label: "DevOps (AWS, Docker, Kubernetes)", value: "devops" },
+  { label: "TensorFlow", value: "tensorflow" },
+  { label: "PyTorch", value: "pytorch" },
+  { label: "Tailwind", value: "tailwind" },
+  { label: "GraphQL", value: "graphql" },
+  { label: "gRPC", value: "grpc" },
+  { label: "Redis", value: "redis" },
+  { label: "MongoDB", value: "mongodb" },
+  { label: "C++", value: "cpp" },
+  { label: "Java", value: "java" },
+] as const;
+
+const SKILL_LABELS: Record<string, string> = {
+  typescript: "TypeScript", javascript: "JavaScript", nextjs: "Next.js", node: "Node.js",
+  cpp: "C++", postgres: "PostgreSQL", graphql: "GraphQL", grpc: "gRPC",
+  mongodb: "MongoDB", tensorflow: "TensorFlow", pytorch: "PyTorch", devops: "DevOps",
+  dsa: "DSA", ml: "Machine learning",
+};
+
+function skillLabel(skill: string) {
+  const canonical = normalizeSkillTag(skill);
+  return canonical ? (SKILL_LABELS[canonical] ?? skill) : skill;
+}
 
 const ALL_COLLEGES = [
   "MIT",
@@ -91,7 +102,7 @@ export default function ProfilePage() {
     setUsername(profileData.username ?? "");
     setBio(profileData.bio ?? "");
     setCollege(profileData.college ?? "");
-    setSelectedSkills(profileData.skillTags ?? []);
+    setSelectedSkills(normalizeSkillTags(profileData.skillTags));
     setGithubHandle(profileData.githubUsername ?? profileData.githubHandle ?? "");
     setLeetcodeHandle(profileData.leetcodeHandle ?? "");
     setCodeforcesHandle(profileData.codeforcesHandle ?? "");
@@ -100,21 +111,23 @@ export default function ProfilePage() {
   useEffect(() => setIsHydrated(true), []);
 
   const addSkill = (skill: string) => {
-    if (!selectedSkills.includes(skill)) {
-      setSelectedSkills([...selectedSkills, skill]);
+    const canonicalSkill = normalizeSkillTag(skill);
+    if (canonicalSkill && !selectedSkills.includes(canonicalSkill)) {
+      setSelectedSkills([...selectedSkills, canonicalSkill]);
     }
     setSearchSkill("");
     setShowSkillDropdown(false);
   };
 
   const removeSkill = (skill: string) => {
-    setSelectedSkills(selectedSkills.filter((s) => s !== skill));
+    const canonicalSkill = normalizeSkillTag(skill);
+    setSelectedSkills(selectedSkills.filter((s) => normalizeSkillTag(s) !== canonicalSkill));
   };
 
   const filteredSkills = SKILLS_POOL.filter(
     (s) =>
-      s.toLowerCase().includes(searchSkill.toLowerCase()) &&
-      !selectedSkills.includes(s)
+      (s.label.toLowerCase().includes(searchSkill.toLowerCase()) || s.value.includes(searchSkill.toLowerCase())) &&
+      !selectedSkills.includes(s.value)
   );
 
   const filteredColleges = ALL_COLLEGES.filter((c) =>
@@ -189,7 +202,7 @@ export default function ProfilePage() {
     if (bio !== (profileData?.bio ?? "")) profileChanges.bio = bio;
     if (college !== (profileData?.college ?? "")) profileChanges.college = college;
 
-    const savedSkills = profileData?.skillTags ?? [];
+    const savedSkills = normalizeSkillTags(profileData?.skillTags);
     const skillsChanged = selectedSkills.join("\u0000") !== savedSkills.join("\u0000");
     const saves: Promise<unknown>[] = [];
     if (Object.keys(profileChanges).length > 0) saves.push(saveProfile.mutateAsync(profileChanges));
@@ -285,8 +298,8 @@ export default function ProfilePage() {
         <CompletenessWidget completeness={completeness} missingFields={missingFields} />
         <section id="skills" className="rounded-[1.35rem] border border-white/12 bg-surface p-5 shadow-sm sm:p-6">
           <h2 className="text-[13px] font-medium text-ink mb-3">Skills</h2>
-          <div className="flex flex-wrap gap-1.5 mb-3">{selectedSkills.map((skill) => <button key={skill} onClick={() => removeSkill(skill)} className="px-2.5 py-1 text-[12px] rounded-full bg-primary/10 text-primary border border-primary/20">{skill} ×</button>)}</div>
-          <div className="relative"><input id="searchSkill" value={searchSkill} onChange={(event) => { setSearchSkill(event.target.value); setShowSkillDropdown(true); }} onFocus={() => setShowSkillDropdown(true)} placeholder="Add a skill…" className="w-full px-3.5 py-2 text-[13px] bg-bg border border-border rounded-lg text-ink focus:outline-none focus:border-ring" />{showSkillDropdown && filteredSkills.length > 0 && <div className="absolute z-dropdown left-0 right-0 top-full mt-1 bg-bg border border-border rounded-lg shadow-lg overflow-hidden">{filteredSkills.map((skill) => <button key={skill} onClick={() => addSkill(skill)} className="w-full text-left px-3 py-2 text-[12px] hover:bg-surface">{skill}</button>)}</div>}</div>
+          <div className="flex flex-wrap gap-1.5 mb-3">{selectedSkills.map((skill) => <button key={skill} onClick={() => removeSkill(skill)} className="px-2.5 py-1 text-[12px] rounded-full bg-primary/10 text-primary border border-primary/20">{skillLabel(skill)} ×</button>)}</div>
+          <div className="relative"><input id="searchSkill" value={searchSkill} onChange={(event) => { setSearchSkill(event.target.value); setShowSkillDropdown(true); }} onFocus={() => setShowSkillDropdown(true)} placeholder="Add a skill…" className="w-full px-3.5 py-2 text-[13px] bg-bg border border-border rounded-lg text-ink focus:outline-none focus:border-ring" />{showSkillDropdown && filteredSkills.length > 0 && <div className="absolute z-dropdown left-0 right-0 top-full mt-1 bg-bg border border-border rounded-lg shadow-lg overflow-hidden">{filteredSkills.map((skill) => <button key={skill.value} onClick={() => addSkill(skill.value)} className="w-full text-left px-3 py-2 text-[12px] hover:bg-surface">{skill.label}</button>)}</div>}</div>
           <button onClick={() => saveSkills.mutate()} disabled={saveSkills.isPending} className="mt-3 px-3 py-2 text-[12px] rounded-lg bg-primary text-white disabled:opacity-60">{saveSkills.isPending ? "Saving…" : "Save skills"}</button>
         </section>
         {profileData && <div className="space-y-4">
@@ -417,11 +430,11 @@ export default function ProfilePage() {
                 key={s}
                 className="inline-flex items-center gap-1 px-2.5 py-1 text-[12px] rounded-full bg-primary/10 text-primary border border-primary/20"
               >
-                {s}
+                {skillLabel(s)}
                 <button
                   onClick={() => removeSkill(s)}
                   className="hover:text-primary-hover"
-                  aria-label={`Remove ${s}`}
+                  aria-label={`Remove ${skillLabel(s)}`}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                     <line x1="18" y1="6" x2="6" y2="18" />
@@ -450,11 +463,11 @@ export default function ProfilePage() {
               <div className="absolute z-dropdown left-0 right-0 top-full mt-1 bg-bg border border-border rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
                 {filteredSkills.map((s) => (
                   <button
-                    key={s}
-                    onClick={() => addSkill(s)}
+                    key={s.value}
+                    onClick={() => addSkill(s.value)}
                     className="w-full text-left px-3.5 py-2.5 text-[13px] text-ink hover:bg-surface transition-colors duration-fast"
                   >
-                    {s}
+                    {s.label}
                   </button>
                 ))}
               </div>

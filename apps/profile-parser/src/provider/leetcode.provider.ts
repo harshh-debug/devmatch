@@ -22,6 +22,10 @@ export const leetcodeProvider = {
                             count
                         }
                     }
+                    languageProblemCount {
+                        languageName
+                        problemsSolved
+                    }
                 }
             }
         `;
@@ -61,6 +65,10 @@ export const leetcodeProvider = {
             const easy = submissions.find((s: any) => s.difficulty === 'Easy')?.count ?? 0;
             const medium = submissions.find((s: any) => s.difficulty === 'Medium')?.count ?? 0;
             const hard = submissions.find((s: any) => s.difficulty === 'Hard')?.count ?? 0;
+            const leetcodeLanguages = (userData?.languageProblemCount ?? [])
+                .filter((entry: any) => typeof entry?.languageName === "string" && Number(entry?.problemsSolved) > 0)
+                .sort((left: any, right: any) => Number(right.problemsSolved) - Number(left.problemsSolved))
+                .map((entry: any) => entry.languageName);
 
             return {
                 // LeetCode displays this profile-wide rank independently from
@@ -73,6 +81,10 @@ export const leetcodeProvider = {
                 lcMediumSolved: medium,
                 lcHardSolved: hard,
                 lcTotalSolved: easy + medium + hard,
+                // Ordered by accepted problems solved, so index 0 is the
+                // user's most-used public LeetCode language.
+                leetcodeLanguages,
+                mostUsedLanguage: leetcodeLanguages[0] ?? null,
             };
         } catch (error: any) {
             if (error.name === 'UnrecoverableError') {

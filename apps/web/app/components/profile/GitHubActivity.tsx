@@ -89,10 +89,10 @@ export function GitHubActivity({ profile }: { profile: UserProfile }) {
         </div>
       ) : <p className="mt-4 text-[11px] text-muted">Contribution history will appear after the next GitHub sync.</p>}
 
-      <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-border">
+      <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-3">
         <div><p className="text-[10px] text-muted">CURRENT STREAK</p><p className="font-mono text-[18px] text-ink">{weeks?.length ? streak : (profile.contributionStreak ?? "—")}</p></div>
         <div><p className="text-[10px] text-muted">GITHUB STARS</p><p className="font-mono text-[18px] text-ink">{profile.githubStars ?? "—"}</p></div>
-        <div><p className="text-[10px] text-muted">MOST USED</p><p className="text-[12px] text-ink truncate mt-1" title={languages.join(", ")}>{languages.length ? languages.join(", ") : "—"}</p></div>
+        <div className="col-span-2 sm:col-span-1"><p className="text-[10px] text-muted">MOST USED</p><p className="mt-1 truncate text-[12px] text-ink" title={languages.join(", ")}>{languages.length ? languages.join(", ") : "—"}</p></div>
       </div>
     </section>
   );

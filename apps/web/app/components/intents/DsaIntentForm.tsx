@@ -36,7 +36,7 @@ export function DsaIntentForm({
             {DSA_PROVIDER_PREFERENCES.map((provider) => <option key={provider}>{provider}</option>)}
           </select>
         </label>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           {(value.search.providerPreference === "CODEFORCES" || value.search.providerPreference === "EITHER") && (
             <>
               <NumberField label="CF minimum" value={value.search.codeforcesRatingMin} onChange={(codeforcesRatingMin) => updateSearch({ codeforcesRatingMin })} />

@@ -71,6 +71,8 @@ export interface UserProfile {
   githubStars?: number;
   contributionStreak?: number;
   topLanguages?: string[];
+  /** Public LeetCode languages, ordered by accepted problems solved. */
+  leetcodeLanguages?: string[];
   /** Language usage percentages, e.g. { TypeScript: 62, Rust: 24 }. */
   languages?: Record<string, number>;
 }

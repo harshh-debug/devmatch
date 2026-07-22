@@ -146,7 +146,7 @@ export function IntentModal({
 
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="intent-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-[#0A0A0A] border border-[#262626] rounded-2xl shadow-2xl">
+      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-y-auto rounded-2xl border border-[#262626] bg-[#0A0A0A] shadow-2xl">
         <div className="p-6 sm:p-8">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -181,9 +181,9 @@ export function IntentModal({
                 />
               )}
               {error && <p className="mt-5 text-[12px] text-red-400">{error}</p>}
-              <div className="mt-7 flex justify-end gap-3 border-t border-border pt-5">
-                <button onClick={onClose} className="px-4 py-2 text-[12px] text-muted">Cancel</button>
-                <button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="rounded-lg bg-primary px-5 py-2 text-[12px] font-medium text-white disabled:opacity-50">
+              <div className="mt-7 flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
+                <button onClick={onClose} className="rounded-lg px-4 py-2 text-[12px] text-muted sm:w-auto">Cancel</button>
+                <button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="w-full rounded-lg bg-primary px-5 py-2 text-[12px] font-medium text-white disabled:opacity-50 sm:w-auto">
                   {mutation.isPending ? "Saving…" : mode === "activate" ? "Save and activate" : "Save configuration"}
                 </button>
               </div>

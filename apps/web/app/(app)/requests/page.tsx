@@ -79,7 +79,7 @@ export default function RequestsPage() {
                   }}
                   aria-hidden="true"
                 >
-                  {req.avatarUrl ? <img src={req.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" /> : (req.displayName?.charAt(0) || "U")}
+                  {req.avatarUrl ? <img src={req.avatarUrl} alt="" loading="lazy" decoding="async" className="w-full h-full rounded-full object-cover" /> : (req.displayName?.charAt(0) || "U")}
                 </div>
 
                 <div className="flex-1 min-w-0">
