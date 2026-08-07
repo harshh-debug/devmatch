@@ -37,8 +37,7 @@ yarn-error.log*
 .DS_Store
 *.pem
 
-e2e*
 implementation*.md
-*test.ts
 aura*
 about.md
+.codex

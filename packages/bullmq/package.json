@@ -12,6 +12,9 @@
   "peerDependencies": {
     "typescript": "^5"
   },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
   "dependencies": {
     "bullmq": "^5.78.1"
   }

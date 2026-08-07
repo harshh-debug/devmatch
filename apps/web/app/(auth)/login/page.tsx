@@ -37,9 +37,8 @@ export default function LoginPage() {
 
   function handleGithub() {
     setError(null);
-    // Server-side OAuth redirect; callback returns to /discover (middleware
-    // re-routes to onboarding if incomplete).
-    void signIn("github", { redirectTo: "/discover" });
+    // GitHub can create a new account from this entry point too.
+    void signIn("github", { redirectTo: "/onboarding" });
   }
 
   return (

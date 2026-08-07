@@ -17,7 +17,6 @@ import type { MatchProfile } from "../engine/types";
 
 const PROFILES_HASH = "match_profiles";
 const GLOBAL_EXCLUSION_KEY = (userId: string) => `match-excluded:${userId}`;
-const PROFILE_QUALITY_FLOOR = 20;
 
 type DbUser = Awaited<ReturnType<typeof loadUsers>>[number];
 
@@ -177,6 +176,7 @@ function toMatchProfile(user: DbUser): MatchProfile | null {
     domains: githubSource.domains,
     repositoryTopics: normalizeRepositoryTopics(profile.githubTopics),
   };
+  const technicalSignalReady = profile.skillTags.length >= 3 || usable || Boolean(profile.leetcodeLastSyncedAt) || Boolean(profile.codeforcesLastSyncedAt);
   const intentConfigurations = Object.fromEntries(
     user.intentConfigurations.map((row) => [
       row.intentType,
@@ -193,7 +193,6 @@ function toMatchProfile(user: DbUser): MatchProfile | null {
   ])].filter((intentType) => intentConfigurations[intentType]?.completeness.offerComplete);
 
   if (
-    profile.profileScore < PROFILE_QUALITY_FLOOR ||
     profile.skillVector.length !== SKILL_VECTOR_DIMENSIONS ||
     profile.skillVector.every((value) => value === 0)
   ) {
@@ -214,6 +213,7 @@ function toMatchProfile(user: DbUser): MatchProfile | null {
     vectorVersion: SKILL_VECTOR_VERSION,
     availability: user.availability,
     profileScore: profile.profileScore,
+    technicalSignalReady,
     matchPreferencesRevision: user.matchPreferencesRevision,
     searchIntent,
     intentConfigurations,
@@ -305,7 +305,7 @@ export async function getMatchProfile(userId: string): Promise<MatchProfile | nu
 
 export async function setSingleMatchProfile(profile: MatchProfile): Promise<void> {
   const valid =
-    profile.profileScore >= PROFILE_QUALITY_FLOOR &&
+    (profile.technicalSignalReady ?? profile.skillTags.length >= 3) &&
     profile.vectorVersion === SKILL_VECTOR_VERSION &&
     profile.skillVector.length === SKILL_VECTOR_DIMENSIONS &&
     !profile.skillVector.every((value) => value === 0);

@@ -21,6 +21,7 @@ import type {
   IntentType,
   LevelSource,
   NiceToHaveMatch,
+  MatchReadiness,
   OpenSourceContributionType,
   ResolvedMatchMode,
 } from "@/lib/types";
@@ -265,6 +266,11 @@ function DiscoverPageInner() {
   });
   const searchIntent = intentState?.searchIntent ?? null;
   const activeIntent = searchIntent?.intentType ?? null;
+  const { data: readiness } = useQuery({
+    queryKey: ["users", "me", "match-readiness"],
+    queryFn: () => apiFetch<MatchReadiness>("/users/me/match-readiness", { token }),
+    enabled: !!token,
+  });
 
   const candidateQuery = useQuery({
     queryKey: ["candidates", intentState?.revision, forYouPage, PAGE_LIMIT],
@@ -273,7 +279,7 @@ function DiscoverPageInner() {
         token,
         query: { intentRevision: intentState!.revision, page: forYouPage, limit: PAGE_LIMIT },
       }),
-    enabled: !!token && !!activeIntent && !!intentState && tab === "foryou",
+    enabled: !!token && readiness?.isMatchReady === true && !!activeIntent && !!intentState && tab === "foryou",
   });
 
   const exploreQuery = useQuery({
@@ -283,7 +289,7 @@ function DiscoverPageInner() {
         token,
         query: { page: explorePage, limit: PAGE_LIMIT },
       }),
-    enabled: !!token && tab === "explore",
+    enabled: !!token && readiness?.isMatchReady === true && tab === "explore",
   });
 
   useEffect(() => {
@@ -395,7 +401,14 @@ function DiscoverPageInner() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {tab === "foryou" && !activeIntent && !isFetching && (
+        {readiness && !readiness.isMatchReady && (
+          <div className="col-span-full rounded-[1.5rem] border border-primary/25 bg-primary/5 p-7">
+            <p className="text-sm font-medium text-ink">Finish your matching profile</p>
+            <p className="mt-1 text-[13px] text-muted">Profile score {readiness.profileScore}%. {readiness.blockers.join(" ")}</p>
+            <a href="/onboarding" className="mt-4 inline-block rounded-lg bg-primary px-4 py-2 text-[12px] font-medium text-white">Continue setup</a>
+          </div>
+        )}
+        {readiness?.isMatchReady && tab === "foryou" && !activeIntent && !isFetching && (
           <div className="col-span-full rounded-[1.5rem] border border-white/12 bg-surface py-16 text-center">
             <h3 className="text-ink font-medium mb-1">Set an intent to find matches</h3>
             <p className="text-muted text-[13px] mb-4">Tell us what you are looking for right now.</p>
@@ -404,8 +417,8 @@ function DiscoverPageInner() {
             </button>
           </div>
         )}
-        {isFetching && (tab === "explore" || activeIntent) && <DiscoverLoader intent={tab === "explore" ? "profile" : INTENT_LABELS[activeIntent!]} />}
-        {!isFetching && tab === "foryou" && activeIntent && (candidates as Candidate[]).map((candidate) => (
+        {readiness?.isMatchReady && isFetching && (tab === "explore" || activeIntent) && <DiscoverLoader intent={tab === "explore" ? "profile" : INTENT_LABELS[activeIntent!]} />}
+        {readiness?.isMatchReady && !isFetching && tab === "foryou" && activeIntent && (candidates as Candidate[]).map((candidate) => (
           <div key={candidate.userId}>
             <CandidateCard
               candidate={candidate}
@@ -415,8 +428,8 @@ function DiscoverPageInner() {
             />
           </div>
         ))}
-        {!isFetching && tab === "explore" && (candidates as ExploreCandidate[]).map((candidate) => <ExploreCard key={candidate.userId} candidate={candidate} onAction={(targetId, action) => actionMutation.mutate({ targetId, action, connectionContext: "GENERAL" })} actionPending={actionMutation.isPending} />)}
-        {!isFetching && (tab === "explore" || activeIntent) && candidates.length === 0 && (
+        {readiness?.isMatchReady && !isFetching && tab === "explore" && (candidates as ExploreCandidate[]).map((candidate) => <ExploreCard key={candidate.userId} candidate={candidate} onAction={(targetId, action) => actionMutation.mutate({ targetId, action, connectionContext: "GENERAL" })} actionPending={actionMutation.isPending} />)}
+        {readiness?.isMatchReady && !isFetching && (tab === "explore" || activeIntent) && candidates.length === 0 && (
           <div className="col-span-full rounded-[1.5rem] border border-white/12 bg-surface py-12 text-center">
             <h3 className="text-ink font-medium">
               {queryError ? "Matching preferences need attention" : tab === "explore" ? "No developers to explore right now" : "No developers satisfy the required preferences"}

@@ -165,6 +165,7 @@ export default function ProfilePage() {
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["users", "me"] });
+    void queryClient.invalidateQueries({ queryKey: ["users", "me", "match-readiness"] });
     void queryClient.invalidateQueries({ queryKey: ["explore"] });
     void queryClient.invalidateQueries({ queryKey: ["candidates"] });
   };

@@ -12,6 +12,7 @@ export const userRouter = Router();
 
 // Profile Management
 userRouter.get('/users/me', extractUser, profileHandler.getMe);
+userRouter.get('/users/me/match-readiness', extractUser, profileHandler.getMatchReadiness);
 userRouter.patch('/users/me', extractUser, profileHandler.updateMe);
 userRouter.patch('/users/me/skills', extractUser, profileHandler.updateSkills);
 userRouter.get('/users/search', extractUser, profileHandler.searchUsers);

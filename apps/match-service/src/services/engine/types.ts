@@ -39,6 +39,8 @@ export interface MatchProfile {
   vectorVersion: number;
   availability: Availability;
   profileScore: number;
+  /** Derived by the cache; optional for legacy cached/test profiles. */
+  technicalSignalReady?: boolean;
   matchPreferencesRevision: number;
   searchIntent: IntentConfiguration | null;
   intentConfigurations: Partial<Record<IntentType, IntentConfiguration>>;

@@ -121,3 +121,19 @@ export interface ExploreCandidate {
   experienceProximity: number;
   experienceSource: "CODEFORCES" | "LEETCODE" | "GITHUB" | "UNKNOWN";
 }
+
+export type ReadinessAction = "CONNECT_GITHUB" | "CONNECT_LEETCODE" | "CONNECT_CODEFORCES" | "ADD_SKILLS" | "COMPLETE_INTENT";
+
+export interface MatchReadiness {
+  profileScore: number;
+  isMatchReady: boolean;
+  technicalSignalReady: boolean;
+  vectorReady: boolean;
+  activeIntentReady: boolean;
+  githubUsable: boolean;
+  leetcodeSynced: boolean;
+  codeforcesSynced: boolean;
+  blockers: string[];
+  recommendedActions: ReadinessAction[];
+  activeIntent: IntentType | null;
+}

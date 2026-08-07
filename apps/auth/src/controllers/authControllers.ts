@@ -6,6 +6,7 @@ import { issueToken } from "../services/token.service";
 import { generateUsername, safeUser } from "../services/user.service";
 import { enqueueProfileSync, type SyncPlatform } from '@devmatch/bullmq';
 import { scheduleStaleProfileSyncs } from "../services/staleProfileSync.service";
+import { SKILL_VECTOR_DIMENSIONS } from "@devmatch/shared";
 
 
 
@@ -109,6 +110,13 @@ export const signupUser = async (req: Request, res: Response) => {
 				username: randomUsername,
 				password: hashedPassword,
 				displayName: displayName,
+			},
+		});
+
+		await prismaClient.profile.create({
+			data: {
+				userId: user.id,
+				skillTags: [], topLanguages: [], githubTopics: [], skillVector: Array(SKILL_VECTOR_DIMENSIONS).fill(0),
 			},
 		});
 

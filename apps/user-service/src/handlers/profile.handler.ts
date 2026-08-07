@@ -7,6 +7,7 @@ import {
 	updateSkillsSchema,
 } from "../validators/user.validators";
 import { publish, TOPICS } from "@devmatch/kafka";
+import { matchReadinessService } from "../services/matchReadiness.service";
 
 function toPublicProfile(user: NonNullable<Awaited<ReturnType<typeof profileService.getProfileByUserId>>>) {
 	const { email, password, githubId, profile, ...identity } = user;
@@ -25,9 +26,10 @@ export const profileHandler = {
 			}
 
 			const userId = req.user.id;
-			const [user, intentState] = await Promise.all([
+			const [user, intentState, readiness] = await Promise.all([
 				profileService.getProfileByUserId(userId),
 				intentService.getIntentState(userId),
+				matchReadinessService.get(userId),
 			]);
 
 			if (!user) {
@@ -37,11 +39,17 @@ export const profileHandler = {
 				...user,
 				searchIntentType: intentState.searchIntentType ?? null,
 				intentType: intentState.searchIntentType ?? null,
-				matchingOnboardingComplete: Boolean(
-					intentState.searchIntent?.completeness.offerComplete &&
-					intentState.searchIntent.completeness.searchComplete
-				),
+				matchingOnboardingComplete: readiness.isMatchReady,
 			});
+		} catch (error) {
+			next(error);
+		}
+	},
+
+	async getMatchReadiness(req: Request, res: Response, next: NextFunction) {
+		try {
+			if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+			res.json(await matchReadinessService.get(req.user.id));
 		} catch (error) {
 			next(error);
 		}
@@ -113,7 +121,7 @@ export const profileHandler = {
 				parsed.data,
 			);
 
-			await profileService.computeProfileScore(userId);
+			await matchReadinessService.recomputeScore(userId);
 			await publish(TOPICS.USER_UPDATED, { userId });
 
 			res.json(updatedUser);
@@ -156,7 +164,7 @@ export const profileHandler = {
 			await profileService.updateSkillVector(userId, vector);
 
 			// 4. Update completion score
-			await profileService.computeProfileScore(userId);
+			await matchReadinessService.recomputeScore(userId);
 
 			// 5. Broadcast to Kafka for the match-service
 			await publish(TOPICS.PROFILE_UPDATED, {

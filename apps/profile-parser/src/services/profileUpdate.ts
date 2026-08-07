@@ -1,21 +1,27 @@
 import { prismaClient } from "db/client";
 import { skillTagMapper } from "./skillTagMapper";
-import { buildSkillVector } from "@devmatch/shared";
+import { buildSkillVector, calculateProfileScore } from "@devmatch/shared";
 
 async function recomputeProfileScore(userId: string) {
     const user = await prismaClient.user.findUnique({
         where: { id: userId },
-        include: { profile: true },
+        include: { profile: true, searchIntent: true },
     });
     if (!user?.profile) return 0;
 
-    let score = 0;
-    if (user.displayName) score += 20;
-    if (user.profile.skillTags.length >= 3) score += 20;
-    if (user.profile.githubUsername) score += 20;
-    if (user.profile.lcRating) score += 10;
-    if (user.profile.cfRating) score += 10;
-    if (user.profile.topLanguages.length > 0) score += 20;
+    const githubUsable = Boolean(user.profile.githubUsername && user.profile.githubLastSyncedAt && (
+        user.profile.topLanguages.length > 0 || user.profile.githubTopics.length > 0 || Array.isArray(user.profile.githubContributions)
+    ));
+    const score = calculateProfileScore({
+        displayName: user.displayName,
+        bio: user.bio,
+        college: user.college,
+        skillCount: user.profile.skillTags.length,
+        githubUsable,
+        leetcodeSynced: Boolean(user.profile.leetcodeLastSyncedAt),
+        codeforcesSynced: Boolean(user.profile.codeforcesLastSyncedAt),
+        activeIntentComplete: Boolean(user.searchIntent),
+    });
 
     await prismaClient.profile.update({ where: { userId }, data: { profileScore: score } });
     return score;

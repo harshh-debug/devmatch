@@ -70,13 +70,13 @@ export default function SignupPage() {
       return;
     }
 
-    router.push("/discover");
+    router.push("/onboarding");
     router.refresh();
   }
 
   function handleGithub() {
     setError(null);
-    void signIn("github", { redirectTo: "/discover" });
+    void signIn("github", { redirectTo: "/onboarding" });
   }
 
   return (

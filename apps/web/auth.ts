@@ -48,6 +48,7 @@ const PROTECTED_PREFIXES = [
   "/chat",
   "/profile",
   "/settings",
+  "/onboarding",
 ];
 
 function isProtected(path: string) {

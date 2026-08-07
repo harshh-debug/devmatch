@@ -24,8 +24,8 @@
   "scripts": {
     "dev": "bun --hot src/index.ts",
     "start": "bun src/index.ts",
-    "type-check": "tsc --noEmit",
-    "lint": "eslint src --ext .ts",
-    "test": "bun test"
+    "check-types": "tsc --noEmit",
+    "type-check": "bun run check-types",
+    "lint": "eslint src --ext .ts"
   }
 }

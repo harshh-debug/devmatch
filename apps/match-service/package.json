@@ -4,7 +4,10 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun --hot src/index.ts"
+    "dev": "bun --hot src/index.ts",
+    "start": "bun src/index.ts",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src --ext .ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

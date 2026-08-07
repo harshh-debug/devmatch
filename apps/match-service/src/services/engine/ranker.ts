@@ -27,7 +27,6 @@ import type {
   RecommendationSnapshot,
 } from "./types";
 
-const PROFILE_QUALITY_FLOOR = 20;
 const compatibilityRank: Record<Compatibility, number> = {
   HIGH: 0,
   MEDIUM: 1,
@@ -58,7 +57,7 @@ function levelBand(compatibility: Compatibility): CandidateResult["levelBand"] {
 }
 
 function validProfile(profile: MatchProfile) {
-  return profile.profileScore >= PROFILE_QUALITY_FLOOR &&
+  return (profile.technicalSignalReady ?? profile.skillTags.length >= 3) &&
     profile.vectorVersion === SKILL_VECTOR_VERSION &&
     profile.skillVector.length === SKILL_VECTOR_DIMENSIONS &&
     !profile.skillVector.every((value) => value === 0);
@@ -502,7 +501,10 @@ async function authoritativeRequester(requesterId: string, intentRevision?: numb
   ) {
     requester = await reconstructMatchProfile(requesterId);
   }
-  if (!requester?.searchIntent) {
+  if (!requester || !validProfile(requester)) {
+    throw new MatchEngineError(409, "PROFILE_NOT_READY", "Add technical evidence before discovering developers.");
+  }
+  if (!requester.searchIntent) {
     throw new MatchEngineError(409, "SEARCH_INTENT_REQUIRED", "Set a search intent before discovering candidates.");
   }
   if (

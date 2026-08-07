@@ -134,6 +134,7 @@ export function IntentModal({
     onSuccess: (nextState) => {
       queryClient.setQueryData(["users", "me", "intents"], nextState);
       void queryClient.invalidateQueries({ queryKey: ["users", "me"] });
+      void queryClient.invalidateQueries({ queryKey: ["users", "me", "match-readiness"] });
       void queryClient.invalidateQueries({ queryKey: ["candidates"] });
       void queryClient.invalidateQueries({ queryKey: ["explore"] });
       onSaved?.(nextState);

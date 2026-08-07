@@ -1,13 +1,8 @@
 import { Router } from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
+import { env } from "../config/env";
 import { verifyJWT } from "../middleware/auth";
 
-const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL!;
-const USER_SERVICE_URL = process.env.USER_SERVICE_URL!;
-const MATCH_SERVICE_URL = process.env.MATCH_SERVICE_URL!;
-const CHAT_SERVICE_URL = process.env.CHAT_SERVICE_URL!;
-const BADGE_SERVICE_URL = process.env.BADGE_SERVICE_URL!;
-const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL!;
 const proxyRoutes = Router();
 
 function proxy(target: string) {
@@ -24,17 +19,37 @@ function proxy(target: string) {
 	});
 }
 
-proxyRoutes.use("/auth/link", verifyJWT, proxy(AUTH_SERVICE_URL));
-proxyRoutes.use("/auth", proxy(AUTH_SERVICE_URL));
+export const chatSocketProxy = createProxyMiddleware({
+	target: env.CHAT_SERVICE_URL,
+	changeOrigin: true,
+	ws: true,
+	on: {
+		error: (err, _req, res: any) => {
+			console.error(`[proxy] chat socket upstream error → ${env.CHAT_SERVICE_URL}`, err.message);
+			if (res && typeof res.writeHead === "function") {
+				res.writeHead(502);
+				res.end();
+			}
+		},
+	},
+});
+
+proxyRoutes.use("/auth/link", verifyJWT, proxy(env.AUTH_SERVICE_URL));
+proxyRoutes.use("/auth", proxy(env.AUTH_SERVICE_URL));
 
 // Public profile pages — anyone can view a developer's public profile.
 // e.g. GET /api/v1/users/public/harsh-dev
-proxyRoutes.use("/users/public", proxy(USER_SERVICE_URL));
+proxyRoutes.use("/users/public", proxy(env.USER_SERVICE_URL));
 
-proxyRoutes.use("/users", verifyJWT, proxy(USER_SERVICE_URL));
-proxyRoutes.use("/match", verifyJWT, proxy(MATCH_SERVICE_URL));
-proxyRoutes.use("/chat", verifyJWT, proxy(CHAT_SERVICE_URL));
-proxyRoutes.use("/badges", verifyJWT, proxy(BADGE_SERVICE_URL));
-proxyRoutes.use("/notifications", verifyJWT, proxy(NOTIFICATION_SERVICE_URL));
+proxyRoutes.use("/users", verifyJWT, proxy(env.USER_SERVICE_URL));
+proxyRoutes.use("/match", verifyJWT, proxy(env.MATCH_SERVICE_URL));
+proxyRoutes.use("/chat", verifyJWT, proxy(env.CHAT_SERVICE_URL));
+
+proxyRoutes.use("/badges", verifyJWT, (_req, res) =>
+	res.status(501).json({ error: "SERVICE_NOT_AVAILABLE" }),
+);
+proxyRoutes.use("/notifications", verifyJWT, (_req, res) =>
+	res.status(501).json({ error: "SERVICE_NOT_AVAILABLE" }),
+);
 
 export default proxyRoutes;

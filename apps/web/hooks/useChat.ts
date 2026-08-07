@@ -14,7 +14,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { io, type Socket } from "socket.io-client";
 
 const CHAT_URL =
-  process.env.NEXT_PUBLIC_CHAT_URL ?? "ws://localhost:3005";
+  process.env.NEXT_PUBLIC_CHAT_URL ?? "ws://localhost:3001";
 
 export interface ChatMessage {
   id: string;

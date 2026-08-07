@@ -4,11 +4,12 @@ import {
   intentService,
 } from "../services/intent.service";
 import {
-  intentConfigurationSchema,
+	intentConfigurationSchema,
   intentTypeSchema,
   openToIntentsSchema,
   putSearchIntentSchema,
 } from "../validators/user.validators";
+import { matchReadinessService } from "../services/matchReadiness.service";
 
 function unauthorized(res: Response) {
   return res.status(401).json({ message: "Unauthorized" });
@@ -63,7 +64,9 @@ export const intentHandler = {
           message: "Body intent type must match the route.",
         });
       }
-      res.json(await intentService.saveIntentConfiguration(req.user.id, parsed.data));
+      const result = await intentService.saveIntentConfiguration(req.user.id, parsed.data);
+      await matchReadinessService.recomputeScore(req.user.id);
+      res.json(result);
     } catch (error) {
       handleIntentError(error, res, next);
     }
@@ -81,11 +84,13 @@ export const intentHandler = {
           details: parsed.error.format(),
         });
       }
-      res.json(await intentService.activateSearchIntent(
+      const result = await intentService.activateSearchIntent(
         req.user.id,
         parsed.data.intentType,
         parsed.data.configuration,
-      ));
+      );
+      await matchReadinessService.recomputeScore(req.user.id);
+      res.json(result);
     } catch (error) {
       handleIntentError(error, res, next);
     }
@@ -94,7 +99,9 @@ export const intentHandler = {
   async deleteSearchIntent(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.user?.id) return unauthorized(res);
-      res.json(await intentService.deleteSearchIntent(req.user.id));
+      const result = await intentService.deleteSearchIntent(req.user.id);
+      await matchReadinessService.recomputeScore(req.user.id);
+      res.json(result);
     } catch (error) {
       handleIntentError(error, res, next);
     }
@@ -107,7 +114,9 @@ export const intentHandler = {
       if (!parsed.success) {
         return res.status(400).json({ errors: parsed.error.format() });
       }
-      res.json(await intentService.replaceOpenToIntents(req.user.id, parsed.data.intentTypes));
+      const result = await intentService.replaceOpenToIntents(req.user.id, parsed.data.intentTypes);
+      await matchReadinessService.recomputeScore(req.user.id);
+      res.json(result);
     } catch (error) {
       handleIntentError(error, res, next);
     }

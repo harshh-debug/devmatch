@@ -20,6 +20,7 @@
     "prisma": "^7.5.0"
   },
   "scripts": {
+    "check-types": "tsc --noEmit",
     "seed": "bun prisma/seed.ts",
     "backfill:vectors": "bun prisma/backfillSkillVectors.ts"
   },

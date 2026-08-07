@@ -15,7 +15,10 @@ export const TOPICS = {
 
 const kafkaClient = new Kafka({
 	clientId: process.env.KAFKA_CLIENT_ID || "devmatch-service",
-	brokers: [process.env.KAFKA_BROKERS || "localhost:9092"],
+	brokers: (process.env.KAFKA_BROKERS || "localhost:9092")
+		.split(",")
+		.map((broker) => broker.trim())
+		.filter(Boolean),
 });
 
 const activeConsumers: Consumer[] = [];

@@ -1,3 +1,5 @@
+export { calculateProfileScore, type ProfileQualityInput } from "./profileQuality";
+
 export interface VectorProfile {
     skillTags?: string[] | null;
     lcRating?: number | null;
