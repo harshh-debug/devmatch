@@ -7,6 +7,10 @@ import { leetcodeProvider } from "../provider/leetcode.provider";
 import { codeforcesProvider } from "../provider/codeforces.provider";
 
 const redisConnection = { url: process.env.REDIS_URL || "redis://localhost:6379" };
+const concurrency = Number(process.env.PROFILE_SYNC_CONCURRENCY ?? 2);
+if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new Error("PROFILE_SYNC_CONCURRENCY must be a positive integer");
+}
 
 export const processProfileSync = async (job: { data: SyncJobPayload }) => {
     const { userId, handle, platform } = job.data;
@@ -50,7 +54,7 @@ export const profileSyncWorker = new Worker<SyncJobPayload>(
     processProfileSync, 
     { 
         connection: redisConnection,
-        concurrency: 5,
+        concurrency,
         autorun: false,
         limiter: {
             max: 100, 

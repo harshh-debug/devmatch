@@ -1,29 +1,72 @@
-import express from 'express';
-import helmet from 'helmet';
-import cors from 'cors';
-import { userRouter } from './routes/user.routes';
-import { startOutboxDispatcher } from './services/outbox.dispatcher';
+import express from "express";
+import helmet from "helmet";
+import { createServer } from "node:http";
+import prismaClient from "db/client";
+import { getProducer, disconnectAll } from "@devmatch/kafka";
+import { userRouter } from "./routes/user.routes";
+import { startOutboxDispatcher, stopOutboxDispatcher } from "./services/outbox.dispatcher";
+
+const required = (name: string) => {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+};
+
+const port = Number(process.env.PORT ?? 3003);
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("PORT must be a valid port number");
+required("JWT_SECRET");
+required("DATABASE_URL");
 
 const app = express();
-const PORT = process.env.PORT || 3003;
+const server = createServer(app);
+let ready = false;
+let shuttingDown = false;
 
 app.use(helmet());
-app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
+app.use("/api/v1", userRouter);
+app.get("/health/live", (_req, res) => res.json({ status: "ok", service: "user-service" }));
+app.get("/health/ready", (_req, res) => {
+  res.status(ready ? 200 : 503).json({ status: ready ? "ok" : "not_ready", service: "user-service" });
+});
+app.get("/health", (_req, res) => res.json({ status: ready ? "ok" : "starting", service: "user-service" }));
 
-// Mount the user routes
-app.use('/api/v1', userRouter);
-
-// Standard health check for Docker/Railway
-app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'user-service' }));
-
-// Global error handler for unhandled promise rejections
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('[User Service Error]:', err.message);
-  res.status(500).json({ message: 'Internal server error' });
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("[User Service Error]:", err.message);
+  res.status(500).json({ message: "Internal server error" });
 });
 
-app.listen(PORT, () => {
-  console.log(`User service running on port ${PORT}`);
-  startOutboxDispatcher();
+async function bootstrap() {
+  try {
+    await prismaClient.$queryRawUnsafe("SELECT 1");
+    await getProducer();
+    startOutboxDispatcher();
+    ready = true;
+    console.log("User service dependencies are ready.");
+  } catch (error) {
+    console.error("User service failed its readiness check", error);
+  }
+}
+
+async function shutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  ready = false;
+  console.log(`User service received ${signal}; draining connections.`);
+  await stopOutboxDispatcher();
+  await disconnectAll();
+  server.close(async (error) => {
+    await prismaClient.$disconnect();
+    if (error) process.exitCode = 1;
+    process.exit();
+  });
+  setTimeout(() => process.exit(1), 25_000).unref();
+}
+
+process.once("SIGTERM", () => void shutdown("SIGTERM"));
+process.once("SIGINT", () => void shutdown("SIGINT"));
+
+server.listen(port, () => {
+  console.log(`User service running on port ${port}`);
+  void bootstrap();
 });

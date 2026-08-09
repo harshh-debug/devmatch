@@ -337,11 +337,20 @@ export async function getGlobalExcludedIds(userId: string): Promise<Set<string>>
   }
 }
 
+let reconciliationTimer: ReturnType<typeof setInterval> | null = null;
+
 export function startCacheReconciliation() {
-  const timer = setInterval(() => {
+  if (reconciliationTimer) return;
+  reconciliationTimer = setInterval(() => {
     void warmVectorCache().catch((error) =>
       console.error("[Cache] Reconciliation failed", error),
     );
   }, 5 * 60 * 1_000);
-  timer.unref?.();
+  reconciliationTimer.unref?.();
+}
+
+export function stopCacheReconciliation() {
+  if (!reconciliationTimer) return;
+  clearInterval(reconciliationTimer);
+  reconciliationTimer = null;
 }

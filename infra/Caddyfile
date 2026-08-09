@@ -1,0 +1,16 @@
+{
+	# Caddy uses this email only for ACME certificate notices.
+	email {$CADDY_EMAIL}
+}
+
+# Caddy is deliberately a TLS/transport proxy only. The API gateway owns all
+# HTTP path routing and the Socket.IO/WebSocket upgrade is forwarded as-is.
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api-gateway:3001 {
+		transport http {
+			dial_timeout 5s
+			response_header_timeout 60s
+		}
+	}
+}

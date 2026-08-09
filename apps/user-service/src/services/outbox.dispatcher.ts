@@ -98,3 +98,13 @@ export function startOutboxDispatcher() {
   timer.unref?.();
   console.log(`[Outbox] Dispatcher started as ${dispatcherId}`);
 }
+
+export async function stopOutboxDispatcher() {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+  // Do not begin another batch while the service is draining. An already
+  // claimed event remains recoverable through the existing lease mechanism.
+  console.log("[Outbox] Dispatcher stopped");
+}
