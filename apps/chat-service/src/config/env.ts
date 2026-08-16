@@ -13,3 +13,7 @@ const envSchema = z.object({
 });
 
 export const env = envSchema.parse(process.env);
+
+if (env.NODE_ENV === "production" && new URL(env.ALLOWED_ORIGIN).protocol !== "https:") {
+  throw new Error("ALLOWED_ORIGIN must use HTTPS in production");
+}

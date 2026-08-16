@@ -69,7 +69,7 @@ services:
       - /bin/bash
       - -ec
       - |
-        for topic in profile.updated user.updated match.accepted match.rejected match-preferences.updated; do
+        for topic in profile.updated user.updated user.deleted match.accepted match.rejected match-preferences.updated; do
           /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic "$$topic" --partitions 1 --replication-factor 1
         done
     networks: [backend-network]
@@ -88,7 +88,7 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
-    networks: [backend-network]
+    networks: [backend-network, egress-network]
     mem_limit: 256m
     logging: *default-logging
     healthcheck:
@@ -107,9 +107,11 @@ services:
       PORT: "3003"
     expose: ["3003"]
     depends_on:
+      redis:
+        condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
-    networks: [backend-network]
+    networks: [backend-network, egress-network]
     mem_limit: 384m
     logging: *default-logging
     healthcheck:
@@ -132,7 +134,7 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
-    networks: [backend-network]
+    networks: [backend-network, egress-network]
     mem_limit: 512m
     logging: *default-logging
     healthcheck:
@@ -155,7 +157,7 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
-    networks: [backend-network]
+    networks: [backend-network, egress-network]
     mem_limit: 384m
     logging: *default-logging
     healthcheck:
@@ -179,7 +181,7 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
-    networks: [backend-network]
+    networks: [backend-network, egress-network]
     mem_limit: 512m
     logging: *default-logging
     healthcheck:
@@ -242,13 +244,14 @@ services:
     profiles: ["migration"]
     restart: "no"
     env_file: ${RUNTIME_ENV_FILE}
-    networks: [backend-network]
+    networks: [backend-network, egress-network]
     logging: *default-logging
 
 networks:
   edge-network:
   backend-network:
     internal: true
+  egress-network:
 
 volumes:
   redis-data:

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Footer() {
   return (
     <footer className="border-t border-border py-10">
@@ -16,10 +18,10 @@ export default function Footer() {
 
         {/* Links */}
         <div className="flex items-center gap-6 text-[12px] text-muted">
-          <a href="/" className="hover:text-ink transition-colors duration-fast">GitHub</a>
-          <a href="/" className="hover:text-ink transition-colors duration-fast">Twitter</a>
-          <a href="/" className="hover:text-ink transition-colors duration-fast">Privacy</a>
-          <a href="/" className="hover:text-ink transition-colors duration-fast">Terms</a>
+          <a href="https://github.com/harshh-debug/devmatch" className="hover:text-ink transition-colors duration-fast">GitHub</a>
+          <Link href="/support" className="hover:text-ink transition-colors duration-fast">Support</Link>
+          <Link href="/privacy" className="hover:text-ink transition-colors duration-fast">Privacy</Link>
+          <Link href="/terms" className="hover:text-ink transition-colors duration-fast">Terms</Link>
         </div>
 
         {/* Copyright */}

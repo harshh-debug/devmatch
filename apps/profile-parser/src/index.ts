@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import prismaClient from "db/client";
 import { disconnectAll, getProducer } from "@devmatch/kafka";
 import { profileSyncWorker } from "./queue/worker";
+import { retryUntilReady } from "@devmatch/shared";
 
 const required = (name: string) => {
   const value = process.env[name]?.trim();
@@ -17,6 +18,7 @@ if (!Number.isInteger(healthPort) || healthPort < 1 || healthPort > 65535) {
 required("DATABASE_URL");
 required("REDIS_URL");
 if (process.env.NODE_ENV === "production") required("KAFKA_BROKERS");
+if (process.env.NODE_ENV === "production") required("GITHUB_TOKEN");
 
 let ready = false;
 let shuttingDown = false;
@@ -36,15 +38,20 @@ const healthServer = createServer((request, response) => {
 
 async function bootstrap() {
   console.log("Starting Profile Parser Worker...");
-  try {
+  const dependenciesReady = await retryUntilReady(
+    "Profile Parser dependencies",
+    async () => {
     await prismaClient.$queryRawUnsafe("SELECT 1");
     await getProducer();
     profileSyncWorker.run();
     await profileSyncWorker.waitUntilReady();
+    },
+    { shouldStop: () => shuttingDown },
+  );
+
+  if (dependenciesReady) {
     ready = true;
     console.log("Profile Parser worker is ready for profile-sync jobs.");
-  } catch (error) {
-    console.error("Profile Parser failed its readiness check", error);
   }
 }
 

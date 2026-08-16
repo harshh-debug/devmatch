@@ -4,9 +4,10 @@ WORKDIR /app
 
 FROM base AS pruner
 ARG APP_NAME
+RUN bun install --global turbo@2.8.20
 COPY . .
 # Keep the Turbo version deterministic while producing a minimal workspace tree.
-RUN bunx turbo@2.8.20 prune ${APP_NAME} --docker
+RUN turbo prune ${APP_NAME} --docker
 
 FROM base AS installer
 WORKDIR /app

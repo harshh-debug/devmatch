@@ -9,17 +9,20 @@ function proxy(target: string) {
 	return createProxyMiddleware({
 		target,
 		changeOrigin: true,
+		timeout: 10_000,
+		proxyTimeout: 15_000,
 		pathRewrite: (path, req) => (req as any).originalUrl,
 		on: {
 			error: (err, req, res: any) => {
 				console.error(`[proxy] upstream error → ${target}`, err.message);
-				res.status(502).json({ error: "Upstream service unavailable" });
+				res.status(502).json({ error: "UPSTREAM_UNAVAILABLE" });
 			},
 		},
 	});
 }
 
 export const chatSocketProxy = createProxyMiddleware({
+	pathFilter: "/socket.io",
 	target: env.CHAT_SERVICE_URL,
 	changeOrigin: true,
 	ws: true,

@@ -257,6 +257,28 @@ export async function reconstructMatchProfile(userId: string): Promise<MatchProf
   return profile;
 }
 
+export async function removeMatchProfile(userId: string): Promise<void> {
+  await Promise.all([
+    redisClient.hdel(PROFILES_HASH, userId),
+    redisClient.del(GLOBAL_EXCLUSION_KEY(userId)),
+  ]);
+
+  let cursor = "0";
+  do {
+    const [nextCursor, keys] = await redisClient.scan(
+      cursor,
+      "MATCH",
+      "match-excluded:*",
+      "COUNT",
+      100,
+    );
+    cursor = nextCursor;
+    if (keys.length > 0) {
+      await Promise.all(keys.map((key) => redisClient.srem(key, userId)));
+    }
+  } while (cursor !== "0");
+}
+
 export async function warmVectorCache(): Promise<void> {
   console.log("[Cache] Rebuilding match profile cache from PostgreSQL...");
   const users = await loadUsers();

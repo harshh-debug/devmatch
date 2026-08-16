@@ -260,8 +260,8 @@ model Match {
   id             String      @id @default(uuid())
   userAId        String
   userBId        String
-  userA          User        @relation("MatchUserA", fields: [userAId], references: [id])
-  userB          User        @relation("MatchUserB", fields: [userBId], references: [id])
+  userA          User        @relation("MatchUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB          User        @relation("MatchUserB", fields: [userBId], references: [id], onDelete: Cascade)
   similarityScore Float?
   compatibility MatchCompatibility?
   levelSource MatchLevelSource?
@@ -342,7 +342,7 @@ model ChatRoom {
 model Message {
   id         String      @id @default(uuid())
   chatRoomId String
-  chatRoom   ChatRoom    @relation(fields: [chatRoomId], references: [id])
+  chatRoom   ChatRoom    @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
   senderId   String
   content    String
   type       MessageType @default(TEXT)

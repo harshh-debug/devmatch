@@ -2,6 +2,8 @@ import express from "express";
 import helmet from "helmet";
 import { createServer } from "node:http";
 import prismaClient from "db/client";
+import { retryUntilReady } from "@devmatch/shared";
+import { profileSyncQueue } from "@devmatch/bullmq";
 import { getProducer, disconnectAll } from "@devmatch/kafka";
 import { userRouter } from "./routes/user.routes";
 import { startOutboxDispatcher, stopOutboxDispatcher } from "./services/outbox.dispatcher";
@@ -16,6 +18,10 @@ const port = Number(process.env.PORT ?? 3003);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("PORT must be a valid port number");
 required("JWT_SECRET");
 required("DATABASE_URL");
+if (process.env.NODE_ENV === "production") {
+  required("REDIS_URL");
+  required("KAFKA_BROKERS");
+}
 
 const app = express();
 const server = createServer(app);
@@ -37,14 +43,20 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 async function bootstrap() {
-  try {
-    await prismaClient.$queryRawUnsafe("SELECT 1");
-    await getProducer();
+  const dependenciesReady = await retryUntilReady(
+    "User service dependencies",
+    async () => {
+      await prismaClient.$queryRawUnsafe("SELECT 1");
+      await profileSyncQueue.waitUntilReady();
+      await getProducer();
+    },
+    { shouldStop: () => shuttingDown },
+  );
+
+  if (dependenciesReady) {
     startOutboxDispatcher();
     ready = true;
     console.log("User service dependencies are ready.");
-  } catch (error) {
-    console.error("User service failed its readiness check", error);
   }
 }
 
@@ -54,7 +66,7 @@ async function shutdown(signal: string) {
   ready = false;
   console.log(`User service received ${signal}; draining connections.`);
   await stopOutboxDispatcher();
-  await disconnectAll();
+  await Promise.allSettled([profileSyncQueue.close(), disconnectAll()]);
   server.close(async (error) => {
     await prismaClient.$disconnect();
     if (error) process.exitCode = 1;

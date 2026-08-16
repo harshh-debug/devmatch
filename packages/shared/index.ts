@@ -1,4 +1,5 @@
 export { calculateProfileScore, type ProfileQualityInput } from "./profileQuality";
+export { retryUntilReady } from "./readiness";
 
 export interface VectorProfile {
     skillTags?: string[] | null;

@@ -7,13 +7,16 @@
     "dev": "bun --hot src/index.ts",
     "start": "bun src/index.ts",
     "check-types": "tsc --noEmit",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "test": "bun test --pass-with-no-tests"
   },
   "devDependencies": {
+    "@repo/eslint-config": "*",
     "@types/bun": "latest",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
-    "@types/node": "^26.0.0"
+    "@types/node": "^26.0.0",
+    "eslint": "^9.39.1"
   },
   "peerDependencies": {
     "typescript": "^5"

@@ -1,6 +1,8 @@
 import express from "express";
 import { createServer } from "node:http";
 import prismaClient from "db/client";
+import { retryUntilReady } from "@devmatch/shared";
+import { profileSyncQueue } from "@devmatch/bullmq";
 import authRouter from "./routes/authRoutes";
 
 const required = (name: string) => {
@@ -15,6 +17,7 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 }
 required("JWT_SECRET");
 required("DATABASE_URL");
+if (process.env.NODE_ENV === "production") required("REDIS_URL");
 
 const app = express();
 const server = createServer(app);
@@ -30,12 +33,18 @@ app.get("/health/ready", (_req, res) => {
 app.get("/health", (_req, res) => res.json({ status: ready ? "ok" : "starting", service: "auth-service" }));
 
 async function bootstrap() {
-  try {
-    await prismaClient.$queryRawUnsafe("SELECT 1");
+  const dependenciesReady = await retryUntilReady(
+    "Auth service database",
+    async () => {
+      await prismaClient.$queryRawUnsafe("SELECT 1");
+      await profileSyncQueue.waitUntilReady();
+    },
+    { shouldStop: () => shuttingDown },
+  );
+
+  if (dependenciesReady) {
     ready = true;
     console.log("Auth service database connection is ready.");
-  } catch (error) {
-    console.error("Auth service failed its database readiness check", error);
   }
 }
 
@@ -45,7 +54,7 @@ async function shutdown(signal: string) {
   ready = false;
   console.log(`Auth service received ${signal}; draining connections.`);
   server.close(async (error) => {
-    await prismaClient.$disconnect();
+    await Promise.allSettled([profileSyncQueue.close(), prismaClient.$disconnect()]);
     if (error) process.exitCode = 1;
     process.exit();
   });

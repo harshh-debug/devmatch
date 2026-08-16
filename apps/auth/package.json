@@ -3,7 +3,9 @@
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
+    "@repo/eslint-config": "*",
     "@types/bun": "latest"
+    ,"eslint": "^9.39.1"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -27,6 +29,7 @@
     "start":      "bun src/index.ts",
     "check-types": "tsc --noEmit",
     "type-check": "bun run check-types",
-    "lint":       "eslint src --ext .ts"
+    "lint":       "eslint src --ext .ts",
+    "test":       "bun test --pass-with-no-tests"
   }
 }

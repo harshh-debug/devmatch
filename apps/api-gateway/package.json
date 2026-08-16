@@ -3,7 +3,9 @@
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
+    "@repo/eslint-config": "*",
     "@types/bun": "latest",
+    "eslint": "^9.39.1",
     "wait-on": "^9.0.10"
   },
   "peerDependencies": {
@@ -22,10 +24,11 @@
     "jsonwebtoken": "^9.0.3"
   },
   "scripts": {
-    "dev": "wait-on tcp:3002 tcp:3003 tcp:3004 tcp:3005 && bun --hot src/index.ts",
+    "dev": "wait-on http-get://localhost:3002/health/ready http-get://localhost:3003/health/ready http-get://localhost:3004/health/ready http-get://localhost:3005/health/ready && bun --hot src/index.ts",
     "start": "bun src/index.ts",
     "check-types": "tsc --noEmit",
     "type-check": "bun run check-types",
     "lint": "eslint src --ext .ts"
+    ,"test": "bun test --pass-with-no-tests"
   }
 }

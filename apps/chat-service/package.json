@@ -7,21 +7,25 @@
     "dev": "bun --hot src/index.ts",
     "start": "bun src/index.ts",
     "check-types": "tsc --noEmit",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "test": "bun test --pass-with-no-tests"
   },
   "devDependencies": {
+    "@repo/eslint-config": "*",
     "@types/bun": "latest",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "socket.io-client": "^4.8.3",
-    "ts-node-dev": "^2.0.0"
+    "ts-node-dev": "^2.0.0",
+    "eslint": "^9.39.1"
   },
   "peerDependencies": {
     "typescript": "^6.0.3"
   },
   "dependencies": {
     "@devmatch/kafka": "*",
+    "@devmatch/shared": "*",
     "cors": "^2.8.6",
     "db": "*",
     "express": "^5.2.1",

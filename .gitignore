@@ -21,6 +21,15 @@ coverage
 # Vercel
 .vercel
 
+# Terraform local state and operator configuration
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+backend.hcl
+terraform.tfvars
+!*.tfvars.example
+
 # Build Outputs
 .next/
 out/
@@ -41,3 +50,4 @@ implementation*.md
 aura*
 about.md
 .codex
+DOCKER_COMPOSE_GUIDE.md

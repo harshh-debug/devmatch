@@ -15,6 +15,7 @@ userRouter.get('/users/me', extractUser, profileHandler.getMe);
 userRouter.get('/users/me/match-readiness', extractUser, profileHandler.getMatchReadiness);
 userRouter.patch('/users/me', extractUser, profileHandler.updateMe);
 userRouter.patch('/users/me/skills', extractUser, profileHandler.updateSkills);
+userRouter.delete('/users/me', extractUser, profileHandler.deleteMe);
 userRouter.get('/users/search', extractUser, profileHandler.searchUsers);
 userRouter.get('/users/username-availability', extractUser, profileHandler.checkUsername);
 

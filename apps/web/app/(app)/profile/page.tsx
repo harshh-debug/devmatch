@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/lib/apiClient";
@@ -10,6 +10,7 @@ import { CompletenessWidget } from "@/app/components/profile/CompletenessWidget"
 import { GitHubActivity } from "@/app/components/profile/GitHubActivity";
 import { IntentSettings } from "@/app/components/profile/IntentSettings";
 import { normalizeSkillTag, normalizeSkillTags } from "@devmatch/shared";
+import { signOut } from "next-auth/react";
 
 const SKILLS_POOL = [
   { label: "TypeScript", value: "typescript" },
@@ -44,6 +45,30 @@ function skillLabel(skill: string) {
   return canonical ? (SKILL_LABELS[canonical] ?? skill) : skill;
 }
 
+function ProfilePageSkeleton({ isSettings }: { isSettings: boolean }) {
+  return (
+    <div
+      className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6 sm:py-10"
+      aria-busy="true"
+      aria-label={isSettings ? "Loading settings" : "Loading profile"}
+    >
+      <div className="h-28 animate-pulse rounded-[1.5rem] border border-white/12 bg-surface motion-reduce:animate-none" />
+      <div className="space-y-6">
+        {(isSettings ? ["intent", "name", "username", "bio", "college", "accounts"] : ["completeness", "skills", "activity"]).map((item, index) => (
+          <div
+            key={item}
+            className={`animate-pulse rounded-xl border border-border bg-bg p-5 motion-reduce:animate-none ${index === 3 ? "h-36" : "h-24"}`}
+          >
+            <div className="h-3 w-28 rounded bg-white/10" />
+            <div className="mt-4 h-8 rounded-lg bg-white/5" />
+          </div>
+        ))}
+      </div>
+      <span className="sr-only">Loading profile details…</span>
+    </div>
+  );
+}
+
 const ALL_COLLEGES = [
   "MIT",
   "Stanford",
@@ -59,9 +84,10 @@ const ALL_COLLEGES = [
 
 export default function ProfilePage() {
   const isSettings = usePathname() === "/settings";
-  const [isHydrated, setIsHydrated] = useState(false);
   const token = useToken();
   const queryClient = useQueryClient();
+  const scrolledHashRef = useRef<string | null>(null);
+  const [hydratedProfileId, setHydratedProfileId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
@@ -76,15 +102,18 @@ export default function ProfilePage() {
   const [syncing, setSyncing] = useState(false);
   const [syncingLeetcode, setSyncingLeetcode] = useState(false);
   const [syncingCf, setSyncingCf] = useState(false);
+  const [savingAll, setSavingAll] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
-  const { data: profile } = useQuery({
+  const profileQuery = useQuery({
     queryKey: ["users", "me"],
     queryFn: () => apiFetch<UserProfile>("/users/me", { token }),
     enabled: !!token,
     retry: 0,
   });
+  const profile = profileQuery.data;
   // The current service returns account fields at the top level and synced
   // platform fields under `profile`; present one form-friendly shape to the UI.
   const profileData = useMemo<UserProfile | undefined>(
@@ -95,20 +124,56 @@ export default function ProfilePage() {
     [profile],
   );
 
-  // Hydrate local form state once the profile loads.
-  useEffect(() => {
-    if (!profileData) return;
-    setDisplayName(profileData.displayName ?? "");
-    setUsername(profileData.username ?? "");
-    setBio(profileData.bio ?? "");
-    setCollege(profileData.college ?? "");
-    setSelectedSkills(normalizeSkillTags(profileData.skillTags));
-    setGithubHandle(profileData.githubUsername ?? profileData.githubHandle ?? "");
-    setLeetcodeHandle(profileData.leetcodeHandle ?? "");
-    setCodeforcesHandle(profileData.codeforcesHandle ?? "");
-  }, [profileData]);
+  const hydrateForm = useCallback((data: UserProfile) => {
+    setDisplayName(data.displayName ?? "");
+    setUsername(data.username ?? "");
+    setBio(data.bio ?? "");
+    setCollege(data.college ?? "");
+    setSelectedSkills(normalizeSkillTags(data.skillTags));
+    setGithubHandle(data.githubUsername ?? data.githubHandle ?? "");
+    setLeetcodeHandle(data.leetcodeHandle ?? "");
+    setCodeforcesHandle(data.codeforcesHandle ?? "");
+  }, []);
 
-  useEffect(() => setIsHydrated(true), []);
+  // Hydrate once per signed-in user. Background refetches must not erase drafts.
+  useEffect(() => {
+    if (!profileData || hydratedProfileId === profileData.id) return;
+    hydrateForm(profileData);
+    setHydratedProfileId(profileData.id);
+  }, [hydrateForm, hydratedProfileId, profileData]);
+
+  // Browsers attempt native hash scrolling before this client-rendered form is
+  // available. Retry once the profile has loaded and the targets are mounted.
+  useEffect(() => {
+    if (!isSettings || !profileData || hydratedProfileId !== profileData.id) return;
+
+    const scrollToHash = () => {
+      const hash = window.location.hash;
+      if (!hash || scrolledHashRef.current === hash) return;
+
+      let targetId: string;
+      try {
+        targetId = decodeURIComponent(hash.slice(1));
+      } catch {
+        return;
+      }
+
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      scrolledHashRef.current = hash;
+      target.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+    };
+
+    const frame = window.requestAnimationFrame(scrollToHash);
+    window.addEventListener("hashchange", scrollToHash);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("hashchange", scrollToHash);
+    };
+  }, [hydratedProfileId, isSettings, profileData]);
 
   const addSkill = (skill: string) => {
     const canonicalSkill = normalizeSkillTag(skill);
@@ -163,12 +228,30 @@ export default function ProfilePage() {
   if (!codeforcesHandle) missingFields.push({ label: "Connect Codeforces", pts: 7.5, href: "/settings#codeforcesHandle" });
 
 
-  const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: ["users", "me"] });
-    void queryClient.invalidateQueries({ queryKey: ["users", "me", "match-readiness"] });
-    void queryClient.invalidateQueries({ queryKey: ["explore"] });
-    void queryClient.invalidateQueries({ queryKey: ["candidates"] });
+  const invalidate = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["users", "me"] }),
+      queryClient.invalidateQueries({ queryKey: ["users", "me", "match-readiness"] }),
+      queryClient.invalidateQueries({ queryKey: ["explore"] }),
+      queryClient.invalidateQueries({ queryKey: ["candidates"] }),
+    ]);
   };
+
+  const deleteAccount = useMutation({
+    mutationFn: () => apiFetch("/users/me", {
+      method: "DELETE",
+      token,
+      body: { confirmation: deleteConfirmation },
+    }),
+    onSuccess: async () => {
+      queryClient.clear();
+      await signOut({ redirect: false });
+      window.location.assign("/");
+    },
+    onError: (mutationError) => {
+      setError(mutationError instanceof ApiError ? mutationError.message : "Could not delete your account.");
+    },
+  });
 
   const saveProfile = useMutation({
     mutationFn: (body: Record<string, string>) =>
@@ -194,7 +277,21 @@ export default function ProfilePage() {
       setError(err instanceof ApiError ? err.message : "Could not save skills."),
   });
 
-  function handleSave() {
+  const connectLeetcode = (handle: string) =>
+    apiFetch("/users/me/connect/leetcode", {
+      token,
+      method: "POST",
+      body: { handle },
+    });
+
+  const connectCodeforces = (handle: string) =>
+    apiFetch("/users/me/connect/codeforces", {
+      token,
+      method: "POST",
+      body: { handle },
+    });
+
+  async function handleSave() {
     setError(null);
     setSavedMsg(null);
     const profileChanges: Record<string, string> = {};
@@ -205,23 +302,54 @@ export default function ProfilePage() {
 
     const savedSkills = normalizeSkillTags(profileData?.skillTags);
     const skillsChanged = selectedSkills.join("\u0000") !== savedSkills.join("\u0000");
-    const saves: Promise<unknown>[] = [];
-    if (Object.keys(profileChanges).length > 0) saves.push(saveProfile.mutateAsync(profileChanges));
-    if (skillsChanged) saves.push(saveSkills.mutateAsync());
+    const leetcodeDraft = leetcodeHandle.trim();
+    const codeforcesDraft = codeforcesHandle.trim();
+    const savedLeetcodeHandle = profileData?.leetcodeHandle?.trim() ?? "";
+    const savedCodeforcesHandle = profileData?.codeforcesHandle?.trim() ?? "";
+    const operations: { label: string; run: () => Promise<unknown> }[] = [];
 
-    if (saves.length === 0) {
+    if (Object.keys(profileChanges).length > 0) {
+      operations.push({ label: "profile", run: () => saveProfile.mutateAsync(profileChanges) });
+    }
+    if (skillsChanged) {
+      operations.push({ label: "skills", run: () => saveSkills.mutateAsync() });
+    }
+    if (leetcodeDraft && leetcodeDraft !== savedLeetcodeHandle) {
+      operations.push({ label: "LeetCode", run: () => connectLeetcode(leetcodeDraft) });
+    }
+    if (codeforcesDraft && codeforcesDraft !== savedCodeforcesHandle) {
+      operations.push({ label: "Codeforces", run: () => connectCodeforces(codeforcesDraft) });
+    }
+
+    if (operations.length === 0) {
       setSavedMsg("No changes to save.");
       return;
     }
 
-    Promise.all(saves)
-      .then(() => {
-        invalidate();
-        setSavedMsg("Profile saved.");
-      })
-      .catch(() => {
-        /* errors surfaced via mutation onError */
+    setSavingAll(true);
+    try {
+      const results = await Promise.allSettled(operations.map((operation) => operation.run()));
+      await invalidate();
+
+      const failures = results.flatMap((result, index) => {
+        if (result.status === "fulfilled") return [];
+        const reason = result.reason;
+        const message = reason instanceof ApiError ? reason.message : `Could not save ${operations[index]!.label}.`;
+        return [`${operations[index]!.label}: ${message}`];
       });
+      const successCount = results.length - failures.length;
+
+      if (failures.length === 0) {
+        setLeetcodeHandle(leetcodeDraft);
+        setCodeforcesHandle(codeforcesDraft);
+        setSavedMsg("Profile saved.");
+      } else {
+        setError(failures.join(" "));
+        if (successCount > 0) setSavedMsg("Some changes were saved.");
+      }
+    } finally {
+      setSavingAll(false);
+    }
   }
 
   async function handleSyncGithub() {
@@ -233,7 +361,7 @@ export default function ProfilePage() {
         token,
         method: "POST",
       });
-      invalidate();
+      await invalidate();
       setSavedMsg("GitHub sync started — data will refresh shortly.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "GitHub sync failed.");
@@ -245,18 +373,16 @@ export default function ProfilePage() {
   async function handleSyncLeetcode() {
     setError(null);
     setSavedMsg(null);
-    if (!leetcodeHandle) {
+    const handle = leetcodeHandle.trim();
+    if (!handle) {
       setError("Enter a LeetCode handle first.");
       return;
     }
     setSyncingLeetcode(true);
     try {
-      await apiFetch("/users/me/connect/leetcode", {
-        token,
-        method: "POST",
-        body: { handle: leetcodeHandle },
-      });
-      invalidate();
+      await connectLeetcode(handle);
+      setLeetcodeHandle(handle);
+      await invalidate();
       setSavedMsg("LeetCode sync started — rating will refresh shortly.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "LeetCode sync failed.");
@@ -268,18 +394,16 @@ export default function ProfilePage() {
   async function handleConnectCodeforces() {
     setError(null);
     setSavedMsg(null);
-    if (!codeforcesHandle) {
+    const handle = codeforcesHandle.trim();
+    if (!handle) {
       setError("Enter a Codeforces handle first.");
       return;
     }
     setSyncingCf(true);
     try {
-      await apiFetch("/users/me/connect/codeforces", {
-        token,
-        method: "POST",
-        body: { handle: codeforcesHandle },
-      });
-      invalidate();
+      await connectCodeforces(handle);
+      setCodeforcesHandle(handle);
+      await invalidate();
       setSavedMsg("Codeforces sync started — rating will refresh shortly.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Codeforces sync failed.");
@@ -288,9 +412,30 @@ export default function ProfilePage() {
     }
   }
 
-  if (!isHydrated) {
-    return <div className="max-w-[800px] mx-auto px-4 sm:px-6 py-8 text-[13px] text-muted">Loading profile…</div>;
+  if (!profileData || hydratedProfileId !== profileData.id) {
+    if (profileQuery.isError) {
+      return (
+        <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
+          <div className="rounded-xl border border-danger/30 bg-danger/5 p-5">
+            <p role="alert" className="text-[13px] text-danger">Could not load your profile details.</p>
+            <button
+              type="button"
+              onClick={() => void profileQuery.refetch()}
+              className="mt-3 rounded-lg border border-border px-4 py-2 text-[12px] font-medium text-ink transition-colors hover:border-primary/50"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return <ProfilePageSkeleton isSettings={isSettings} />;
   }
+
+  const savedGithubHandle = profileData.githubUsername ?? profileData.githubHandle ?? "";
+  const savedLeetcodeHandle = profileData.leetcodeHandle ?? "";
+  const savedCodeforcesHandle = profileData.codeforcesHandle ?? "";
+  const formBusy = savingAll || saveProfile.isPending || saveSkills.isPending || syncing || syncingLeetcode || syncingCf;
 
   if (!isSettings) {
     return (
@@ -485,23 +630,23 @@ export default function ProfilePage() {
           <div className="space-y-4">
             {/* GitHub */}
             <div className="space-y-2">
-              <div id="githubHandle" className="flex items-center gap-3 p-3 rounded-lg border border-border">
+              <div id="githubHandle" className="scroll-mt-24 flex items-center gap-3 rounded-lg border border-border p-3">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-ink shrink-0" aria-hidden="true">
                   <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
                 </svg>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium text-ink">GitHub</p>
-                  <p className="text-[11px] text-muted truncate">{githubHandle || "Not connected"}</p>
+                  <p className="text-[11px] text-muted truncate">{savedGithubHandle || "Not connected"}</p>
                 </div>
-                {githubHandle && (
+                {savedGithubHandle && (
                   <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-success/10 text-success">
                     Connected
                   </span>
                 )}
-                {githubHandle ? (
+                {savedGithubHandle ? (
                   <button
                     onClick={handleSyncGithub}
-                    disabled={syncing}
+                    disabled={formBusy}
                     className="text-[11px] text-primary hover:text-primary-hover font-medium transition-colors disabled:opacity-60"
                   >
                     {syncing ? "Syncing…" : "Sync"}
@@ -519,29 +664,29 @@ export default function ProfilePage() {
 
             {/* LeetCode */}
             <div className="space-y-2">
-            <div id="leetcodeHandle" className="flex items-center gap-3 p-3 rounded-lg border border-border">
+            <div id="leetcodeHandle" className="scroll-mt-24 flex items-center gap-3 rounded-lg border border-border p-3">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-warning shrink-0" aria-hidden="true">
                 <path d="M16.102 16.977a.891.891 0 0 1-.637-.256l-5.207-5.208a.894.894 0 0 1 0-1.27l5.207-5.207a.891.891 0 0 1 1.27 0l.001.001 1.808 1.808a.891.891 0 0 1 0 1.27l-3.94 3.94 3.94 3.94a.891.891 0 0 1 0 1.27l-1.808 1.808a.891.891 0 0 1-.637.256z" />
                 <path d="M9.255 19.963H4.226a.891.891 0 0 1-.891-.891V4.926a.891.891 0 0 1 .891-.891h5.029" />
               </svg>
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-medium text-ink">LeetCode</p>
-                <p className="text-[11px] text-muted truncate">{leetcodeHandle || "Not connected"}</p>
+                <p className="text-[11px] text-muted truncate">{savedLeetcodeHandle || "Not connected"}</p>
               </div>
-              {leetcodeHandle && (
+              {savedLeetcodeHandle && (
                 <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-success/10 text-success">
                   Connected
                 </span>
               )}
               <button
                 onClick={handleSyncLeetcode}
-                disabled={syncingLeetcode}
+                disabled={formBusy || (!savedLeetcodeHandle && !leetcodeHandle.trim())}
                 className="text-[11px] text-primary hover:text-primary-hover font-medium transition-colors disabled:opacity-60"
               >
-                {syncingLeetcode ? "Syncing…" : leetcodeHandle ? "Sync" : "Connect"}
+                {syncingLeetcode ? "Syncing…" : savedLeetcodeHandle ? "Sync" : "Connect"}
               </button>
             </div>
-            {!profileData?.leetcodeHandle && (
+            {!savedLeetcodeHandle && (
               <input
                 type="text"
                 value={leetcodeHandle}
@@ -554,7 +699,7 @@ export default function ProfilePage() {
 
             {/* Codeforces */}
             <div className="space-y-2">
-              <div className="flex items-center gap-3 p-3 rounded-lg border border-border">
+              <div id="codeforcesHandle" className="scroll-mt-24 flex items-center gap-3 rounded-lg border border-border p-3">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-info shrink-0" aria-hidden="true">
                   <rect x="1" y="14" width="4" height="7" rx="1" />
                   <rect x="7" y="10" width="4" height="11" rx="1" />
@@ -563,22 +708,22 @@ export default function ProfilePage() {
                 </svg>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium text-ink">Codeforces</p>
-                  <p className="text-[11px] text-muted">{codeforcesHandle || "Not connected"}</p>
+                  <p className="text-[11px] text-muted">{savedCodeforcesHandle || "Not connected"}</p>
                 </div>
-                {codeforcesHandle && (
+                {savedCodeforcesHandle && (
                   <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-success/10 text-success">
                     Connected
                   </span>
                 )}
                 <button
                   onClick={handleConnectCodeforces}
-                  disabled={syncingCf}
+                  disabled={formBusy || (!savedCodeforcesHandle && !codeforcesHandle.trim())}
                   className="text-[11px] text-primary hover:text-primary-hover font-medium transition-colors disabled:opacity-60"
                 >
-                  {syncingCf ? "Connecting…" : codeforcesHandle ? "Sync" : "Connect"}
+                  {syncingCf ? "Connecting…" : savedCodeforcesHandle ? "Sync" : "Connect"}
                 </button>
               </div>
-              {!profileData?.codeforcesHandle && (
+              {!savedCodeforcesHandle && (
                 <input
                   type="text"
                   value={codeforcesHandle}
@@ -608,30 +753,49 @@ export default function ProfilePage() {
             onClick={() => {
               setError(null);
               setSavedMsg(null);
-              // Re-hydrate from the cached profile.
-              if (profileData) {
-                setDisplayName(profileData.displayName ?? "");
-                setBio(profileData.bio ?? "");
-                setCollege(profileData.college ?? "");
-                setSelectedSkills(profileData.skillTags ?? []);
-                setGithubHandle(profileData.githubUsername ?? profileData.githubHandle ?? "");
-                setLeetcodeHandle(profileData.leetcodeHandle ?? "");
-                setCodeforcesHandle(profileData.codeforcesHandle ?? "");
-              }
+              hydrateForm(profileData);
             }}
+            disabled={formBusy}
             className="px-5 py-2.5 text-[13px] font-medium rounded-lg border border-border text-muted hover:text-ink transition-colors duration-fast"
           >
             Cancel
           </button>
           <button
             type="button"
-            onClick={handleSave}
-            disabled={saveProfile.isPending || saveSkills.isPending}
+            onClick={() => void handleSave()}
+            disabled={formBusy}
             className="px-5 py-2.5 text-[13px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors duration-fast disabled:opacity-60"
           >
-            {saveProfile.isPending || saveSkills.isPending ? "Saving…" : "Save changes"}
+            {savingAll || saveProfile.isPending || saveSkills.isPending ? "Saving…" : "Save changes"}
           </button>
         </div>
+
+        <section className="rounded-xl border border-danger/40 bg-danger/5 p-5">
+          <h2 className="text-[13px] font-semibold text-danger">Delete account</h2>
+          <p className="mt-2 text-[12px] leading-relaxed text-muted">
+            This permanently removes your profile, matching history, connected-account data, and chat rooms. This action cannot be undone.
+          </p>
+          <label htmlFor="deleteConfirmation" className="mt-4 block text-[12px] text-ink">
+            Type <span className="font-mono font-semibold">DELETE</span> to confirm
+          </label>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <input
+              id="deleteConfirmation"
+              value={deleteConfirmation}
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+              autoComplete="off"
+              className="flex-1 rounded-lg border border-border bg-bg px-3.5 py-2.5 text-[13px] text-ink focus:border-danger focus:outline-none"
+            />
+            <button
+              type="button"
+              disabled={deleteConfirmation !== "DELETE" || deleteAccount.isPending}
+              onClick={() => deleteAccount.mutate()}
+              className="rounded-lg bg-danger px-4 py-2.5 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {deleteAccount.isPending ? "Deleting…" : "Delete permanently"}
+            </button>
+          </div>
+        </section>
       </div>
     </div>
   );

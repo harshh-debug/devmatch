@@ -7,6 +7,7 @@ import { matchRoutes } from "./routes/match.routes";
 import { startCacheReconciliation, stopCacheReconciliation, warmVectorCache } from "./services/cache/vectorCache";
 import { redisClient } from "./services/cache/redis";
 import { startKafkaConsumers } from "./services/kafka/consumer";
+import { retryUntilReady } from "@devmatch/shared";
 
 dotenv.config();
 
@@ -38,18 +39,23 @@ app.get("/health", (_req, res) => res.status(200).json({ status: ready ? "ok" : 
 app.use("/api/v1/match", matchRoutes);
 
 async function bootstrap() {
-  try {
-    console.log("Starting Match Service Boot Sequence...");
+  console.log("Starting Match Service Boot Sequence...");
+  const dependenciesReady = await retryUntilReady(
+    "Match service dependencies",
+    async () => {
     await prismaClient.$queryRawUnsafe("SELECT 1");
     await redisClient.ping();
     await warmVectorCache();
     await createTopicsIfNotExist();
     await startKafkaConsumers();
+    },
+    { shouldStop: () => shuttingDown },
+  );
+
+  if (dependenciesReady) {
     startCacheReconciliation();
     ready = true;
     console.log("Match service dependencies and cache are ready.");
-  } catch (error) {
-    console.error("Match service failed its readiness check", error);
   }
 }
 

@@ -2,13 +2,17 @@
   "name": "@devmatch/kafka",
   "module": "index.ts",
   "devDependencies": {
+    "@repo/eslint-config": "*",
     "@types/bun": "latest"
+    ,"eslint": "^9.39.1"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "lint": "eslint . --ext .ts",
+    "test": "bun test --pass-with-no-tests"
   },
   "exports": {
     ".": "./index.ts"

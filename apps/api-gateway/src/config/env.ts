@@ -40,3 +40,7 @@ export const env = {
   RATE_LIMIT_WINDOW_MS: positiveInteger("RATE_LIMIT_WINDOW_MS", 60_000),
   RATE_LIMIT_MAX_PER_IP: positiveInteger("RATE_LIMIT_MAX_PER_IP", 100),
 };
+
+if (env.NODE_ENV === "production" && new URL(env.ALLOWED_ORIGIN).protocol !== "https:") {
+  throw new Error("ALLOWED_ORIGIN must use HTTPS in production");
+}

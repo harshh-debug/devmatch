@@ -160,3 +160,7 @@ export const openToIntentsSchema = z.object({
 export const connectPlatformSchema = z.object({
   handle: z.string().trim().min(1, "Handle cannot be empty"),
 });
+
+export const deleteAccountSchema = z.object({
+  confirmation: z.literal("DELETE"),
+}).strict();

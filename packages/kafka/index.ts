@@ -8,17 +8,30 @@ import {
 export const TOPICS = {
 	PROFILE_UPDATED: "profile.updated",
 	USER_UPDATED: "user.updated",
+	USER_DELETED: "user.deleted",
 	MATCH_ACCEPTED: "match.accepted",
 	MATCH_REJECTED: "match.rejected",
 	MATCH_PREFERENCES_UPDATED: "match-preferences.updated",
 } as const;
 
+const brokerValue = process.env.KAFKA_BROKERS?.trim();
+if (process.env.NODE_ENV === "production" && !brokerValue) {
+	throw new Error("KAFKA_BROKERS is required in production");
+}
+
 const kafkaClient = new Kafka({
 	clientId: process.env.KAFKA_CLIENT_ID || "devmatch-service",
-	brokers: (process.env.KAFKA_BROKERS || "localhost:9092")
+	brokers: (brokerValue || "localhost:9092")
 		.split(",")
 		.map((broker) => broker.trim())
 		.filter(Boolean),
+	connectionTimeout: 10_000,
+	requestTimeout: 30_000,
+	retry: {
+		initialRetryTime: 300,
+		maxRetryTime: 30_000,
+		retries: 8,
+	},
 });
 
 const activeConsumers: Consumer[] = [];
@@ -72,10 +85,11 @@ export async function subscribe<T>(
 	messageHandler: (topic: string, payload: T) => Promise<void>,
 ): Promise<Consumer> {
 	const consumer = kafkaClient.consumer({ groupId });
-	await consumer.connect();
-	await consumer.subscribe({ topics, fromBeginning: true });
+	try {
+		await consumer.connect();
+		await consumer.subscribe({ topics, fromBeginning: true });
 
-	await consumer.run({
+		await consumer.run({
 		eachMessage: async ({ topic, message }) => {
 			if (!message.value) return;
 
@@ -95,7 +109,11 @@ export async function subscribe<T>(
 				console.error("Message handeler error: " + err);
 			}
 		},
-	});
+		});
+	} catch (error) {
+		await consumer.disconnect().catch(() => undefined);
+		throw error;
+	}
 
 	activeConsumers.push(consumer);
 	console.log(
@@ -125,6 +143,7 @@ export async function createTopicsIfNotExist(): Promise<void> {
 		}
 	} catch (error) {
 		console.error("[Kafka Admin] Failed to verify/create topics:", error);
+		throw error;
 	} finally {
 		await admin.disconnect();
 	}

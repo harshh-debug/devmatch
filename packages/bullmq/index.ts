@@ -1,7 +1,12 @@
 import { Queue } from 'bullmq';
 
+const configuredRedisUrl = process.env.REDIS_URL?.trim();
+if (process.env.NODE_ENV === 'production' && !configuredRedisUrl) {
+  throw new Error('REDIS_URL is required in production');
+}
+
 const connection = {
-  url: process.env.REDIS_URL || 'redis://localhost:6379',
+  url: configuredRedisUrl || 'redis://localhost:6379',
 };
 
 // 1. Explicitly type the supported platforms

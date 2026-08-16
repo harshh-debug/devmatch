@@ -133,6 +133,7 @@ export interface MatchReadiness {
   githubUsable: boolean;
   leetcodeSynced: boolean;
   codeforcesSynced: boolean;
+  githubSyncStatus: "NOT_CONNECTED" | "SYNCING" | "COMPLETE" | "FAILED" | "UNKNOWN";
   blockers: string[];
   recommendedActions: ReadinessAction[];
   activeIntent: IntentType | null;

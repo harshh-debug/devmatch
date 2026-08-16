@@ -3,7 +3,9 @@ import axios from "axios";
 export const codeforcesProvider = {
     async fetchProfileData(handle: string) {
         try {
-            const response = await axios.get(`https://codeforces.com/api/user.info?handles=${handle}`);
+            const response = await axios.get(`https://codeforces.com/api/user.info?handles=${handle}`, {
+                timeout: 15_000,
+            });
             
             if (response.data.status !== "OK") {
                 throw new Error(`Codeforces API returned status: ${response.data.status}`);

@@ -1,6 +1,40 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+  "globalEnv": [
+    "NODE_ENV",
+    "JWT_SECRET",
+    "DATABASE_URL",
+    "DIRECT_DATABASE_URL",
+    "DATABASE_POOL_MAX",
+    "DATABASE_CONNECT_TIMEOUT_MS",
+    "DATABASE_IDLE_TIMEOUT_MS",
+    "REDIS_URL",
+    "REDIS_PASSWORD",
+    "KAFKA_BROKERS",
+    "KAFKA_CLIENT_ID",
+    "ALLOWED_ORIGIN",
+    "API_GATEWAY_PORT",
+    "AUTH_SERVICE_URL",
+    "USER_SERVICE_URL",
+    "MATCH_SERVICE_URL",
+    "CHAT_SERVICE_URL",
+    "RATE_LIMIT_WINDOW_MS",
+    "RATE_LIMIT_MAX_PER_IP",
+    "PROFILE_SYNC_CONCURRENCY",
+    "WORKER_HEALTH_PORT",
+    "PORT",
+    "GITHUB_TOKEN",
+    "AUTH_URL",
+    "AUTH_SECRET",
+    "AUTH_GITHUB_ID",
+    "AUTH_GITHUB_SECRET",
+    "GITHUB_LINK_ID",
+    "GITHUB_LINK_SECRET",
+    "NEXT_PUBLIC_API_URL",
+    "NEXT_PUBLIC_CHAT_URL"
+    ,"NEXT_PUBLIC_SUPPORT_EMAIL"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -12,6 +46,10 @@
     },
     "check-types": {
       "dependsOn": ["^check-types"]
+    },
+    "test": {
+      "dependsOn": ["^test"],
+      "outputs": []
     },
     "dev": {
       "cache": false,

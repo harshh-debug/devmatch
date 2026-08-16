@@ -3,12 +3,16 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "db:check": "bun run --cwd packages/db prisma:check",
+    "dev": "turbo run dev --filter=auth --filter=user-service --filter=match-service --filter=chat-service --filter=profile-parser --filter=api-gateway",
     "lint": "turbo run lint",
+    "test": "turbo run test",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types"
   },
   "devDependencies": {
+    "@repo/eslint-config": "*",
+    "eslint": "^9.39.1",
     "prettier": "^3.7.4",
     "turbo": "^2.8.20",
     "typescript": "5.9.2"

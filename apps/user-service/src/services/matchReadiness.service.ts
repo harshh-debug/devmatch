@@ -1,8 +1,10 @@
 import prismaClient from "db/client";
 import { calculateProfileScore, type IntentState } from "@devmatch/shared";
+import { profileSyncQueue } from "@devmatch/bullmq";
 import { intentService } from "./intent.service";
 
 export type ReadinessAction = "CONNECT_GITHUB" | "CONNECT_LEETCODE" | "CONNECT_CODEFORCES" | "ADD_SKILLS" | "COMPLETE_INTENT";
+export type GitHubSyncStatus = "NOT_CONNECTED" | "SYNCING" | "COMPLETE" | "FAILED" | "UNKNOWN";
 
 export interface MatchReadiness {
   profileScore: number;
@@ -13,6 +15,7 @@ export interface MatchReadiness {
   githubUsable: boolean;
   leetcodeSynced: boolean;
   codeforcesSynced: boolean;
+  githubSyncStatus: GitHubSyncStatus;
   blockers: string[];
   recommendedActions: ReadinessAction[];
   activeIntent: IntentState["searchIntentType"];
@@ -22,6 +25,24 @@ function githubUsable(profile: { githubUsername: string | null; githubLastSynced
   return Boolean(profile.githubUsername && profile.githubLastSyncedAt && (
     profile.topLanguages.length > 0 || profile.githubTopics.length > 0 || Array.isArray(profile.githubContributions)
   ));
+}
+
+async function getGitHubSyncStatus(profile: { userId: string; githubUsername: string | null; githubLastSyncedAt: Date | null }): Promise<GitHubSyncStatus> {
+  if (!profile.githubUsername) return "NOT_CONNECTED";
+  if (profile.githubLastSyncedAt) return "COMPLETE";
+
+  try {
+    const job = await profileSyncQueue.getJob(`profile-sync-${profile.userId}-github`);
+    if (!job) return "FAILED";
+    const state = await job.getState();
+    if (["waiting", "active", "delayed", "prioritized", "waiting-children", "completed"].includes(state)) {
+      return "SYNCING";
+    }
+    return state === "failed" ? "FAILED" : "UNKNOWN";
+  } catch (error) {
+    console.error("[MatchReadiness] Could not read GitHub sync status", error);
+    return "UNKNOWN";
+  }
 }
 
 export const matchReadinessService = {
@@ -35,11 +56,13 @@ export const matchReadinessService = {
       return {
         profileScore: 0, isMatchReady: false, technicalSignalReady: false, vectorReady: false,
         activeIntentReady: false, githubUsable: false, leetcodeSynced: false, codeforcesSynced: false,
+        githubSyncStatus: "NOT_CONNECTED",
         blockers: ["Create your developer profile to start matching."],
         recommendedActions: ["CONNECT_GITHUB", "ADD_SKILLS", "COMPLETE_INTENT"], activeIntent: null,
       };
     }
     const github = githubUsable(profile);
+    const githubSyncStatus = await getGitHubSyncStatus(profile);
     const leetcode = Boolean(profile.leetcodeLastSyncedAt);
     const codeforces = Boolean(profile.codeforcesLastSyncedAt);
     const technicalSignalReady = profile.skillTags.length >= 3 || github || leetcode || codeforces;
@@ -68,7 +91,7 @@ export const matchReadinessService = {
       displayName: user.displayName, bio: user.bio, college: user.college, skillCount: profile.skillTags.length,
       githubUsable: github, leetcodeSynced: leetcode, codeforcesSynced: codeforces, activeIntentComplete: activeIntentReady,
     });
-    return { profileScore, isMatchReady, technicalSignalReady, vectorReady, activeIntentReady, githubUsable: github, leetcodeSynced: leetcode, codeforcesSynced: codeforces, blockers, recommendedActions: [...new Set(actions)], activeIntent };
+    return { profileScore, isMatchReady, technicalSignalReady, vectorReady, activeIntentReady, githubUsable: github, leetcodeSynced: leetcode, codeforcesSynced: codeforces, githubSyncStatus, blockers, recommendedActions: [...new Set(actions)], activeIntent };
   },
 
   async recomputeScore(userId: string) {

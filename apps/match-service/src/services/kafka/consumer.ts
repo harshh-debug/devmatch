@@ -1,6 +1,6 @@
 import { subscribe, TOPICS } from "@devmatch/kafka";
 import type { MatchPreferencesUpdatedV1 } from "@devmatch/shared";
-import { reconstructMatchProfile } from "../cache/vectorCache";
+import { reconstructMatchProfile, removeMatchProfile } from "../cache/vectorCache";
 import { redisClient } from "../cache/redis";
 
 const PROCESSED_EVENT_KEY = (eventId: string) => `match-event:${eventId}`;
@@ -16,9 +16,19 @@ async function syncUserCache(userId: string) {
 export async function startKafkaConsumers() {
   console.log("[Kafka] Starting match-service consumers...");
   await subscribe<Record<string, unknown>>(
-    [TOPICS.PROFILE_UPDATED, TOPICS.USER_UPDATED, TOPICS.MATCH_PREFERENCES_UPDATED],
+    [TOPICS.PROFILE_UPDATED, TOPICS.USER_UPDATED, TOPICS.USER_DELETED, TOPICS.MATCH_PREFERENCES_UPDATED],
     "match-service-group",
     async (topic, payload) => {
+      if (topic === TOPICS.USER_DELETED) {
+        const userId = typeof payload.userId === "string" ? payload.userId : null;
+        if (!userId) {
+          console.error("[Kafka] Ignoring user.deleted event without userId");
+          return;
+        }
+        await removeMatchProfile(userId);
+        return;
+      }
+
       if (topic === TOPICS.MATCH_PREFERENCES_UPDATED) {
         const event = payload as unknown as MatchPreferencesUpdatedV1;
         if (

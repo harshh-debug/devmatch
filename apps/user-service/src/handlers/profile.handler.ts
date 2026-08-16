@@ -5,9 +5,12 @@ import { buildSkillVector, normalizeSkillTags } from "@devmatch/shared";
 import {
 	updateMeSchema,
 	updateSkillsSchema,
+	deleteAccountSchema,
 } from "../validators/user.validators";
 import { publish, TOPICS } from "@devmatch/kafka";
 import { matchReadinessService } from "../services/matchReadiness.service";
+import prismaClient from "db/client";
+import { profileSyncQueue } from "@devmatch/bullmq";
 
 function toPublicProfile(user: NonNullable<Awaited<ReturnType<typeof profileService.getProfileByUserId>>>) {
 	const { email, password, githubId, profile, ...identity } = user;
@@ -178,6 +181,56 @@ export const profileHandler = {
 				success: true,
 				profile: updatedProfile,
 			});
+		} catch (error) {
+			next(error);
+		}
+	},
+
+	async deleteMe(req: Request, res: Response, next: NextFunction) {
+		try {
+			if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+			const parsed = deleteAccountSchema.safeParse(req.body);
+			if (!parsed.success) {
+				return res.status(400).json({
+					code: "CONFIRMATION_REQUIRED",
+					message: 'Type "DELETE" to confirm permanent account deletion.',
+				});
+			}
+
+			const userId = req.user.id;
+			const deleted = await prismaClient.$transaction(async (transaction) => {
+				const user = await transaction.user.findUnique({ where: { id: userId }, select: { id: true } });
+				if (!user) return false;
+
+				await transaction.matchAction.deleteMany({
+					where: { OR: [{ actorId: userId }, { targetId: userId }] },
+				});
+				await transaction.connectionPair.deleteMany({
+					where: { OR: [{ userAId: userId }, { userBId: userId }] },
+				});
+				await transaction.outboxEvent.deleteMany({ where: { aggregateId: userId } });
+				await transaction.user.delete({ where: { id: userId } });
+				await transaction.outboxEvent.create({
+					data: {
+						topic: TOPICS.USER_DELETED,
+						aggregateId: userId,
+						eventType: "USER_DELETED",
+						schemaVersion: 1,
+						payload: { userId },
+					},
+				});
+				return true;
+			});
+
+			if (!deleted) return res.status(404).json({ message: "User not found" });
+			await Promise.allSettled(
+				(["github", "leetcode", "codeforces"] as const).map(async (platform) => {
+					const job = await profileSyncQueue.getJob(`profile-sync-${userId}-${platform}`);
+					await job?.remove();
+				}),
+			);
+			return res.status(204).send();
 		} catch (error) {
 			next(error);
 		}

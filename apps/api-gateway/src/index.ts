@@ -10,6 +10,7 @@ import { env } from "./config/env";
 const app = express();
 const httpServer = createServer(app);
 let shuttingDown = false;
+let ready = false;
 
 app.set("trust proxy", 1);
 app.use(helmet());
@@ -19,7 +20,10 @@ app.get("/health/live", (_req: Request, res: Response) => {
   res.json({ status: "ok", service: "api-gateway" });
 });
 app.get("/health/ready", (_req: Request, res: Response) => {
-  res.json({ status: "ok", service: "api-gateway" });
+  res.status(ready ? 200 : 503).json({
+    status: ready ? "ok" : "not_ready",
+    service: "api-gateway",
+  });
 });
 // Backwards-compatible local health route.
 app.get("/health", (_req: Request, res: Response) => {
@@ -28,7 +32,14 @@ app.get("/health", (_req: Request, res: Response) => {
 
 app.use(rateLimiter);
 app.use("/api/v1", proxyRoutes);
-app.use("/socket.io", chatSocketProxy);
+app.use(chatSocketProxy);
+app.use((_req: Request, res: Response) => {
+  res.status(404).json({ error: "NOT_FOUND" });
+});
+
+// Environment validation and proxy construction happen synchronously above.
+// Only report ready once that routing table has been mounted successfully.
+ready = true;
 
 httpServer.on("upgrade", (request, socket, head) => {
   if (request.url?.startsWith("/socket.io")) {
@@ -41,6 +52,7 @@ httpServer.on("upgrade", (request, socket, head) => {
 function shutdown(signal: string) {
   if (shuttingDown) return;
   shuttingDown = true;
+  ready = false;
   console.log(`API gateway received ${signal}; draining connections.`);
   httpServer.close((error) => {
     if (error) {
