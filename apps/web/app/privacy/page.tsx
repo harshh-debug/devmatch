@@ -11,8 +11,7 @@ export default function PrivacyPage() {
         <section><h2 className="text-lg font-semibold text-ink">How we use information</h2><p className="mt-2">We use this information to authenticate you, build your profile, calculate recommendations, connect compatible users, operate chat, prevent abuse, and maintain the reliability and security of the service.</p></section>
         <section><h2 className="text-lg font-semibold text-ink">Providers and sharing</h2><p className="mt-2">Infrastructure and authentication data may be processed by Vercel, Amazon Web Services, Neon, and GitHub. Public profile information is visible to other users. We do not sell personal information.</p></section>
         <section><h2 className="text-lg font-semibold text-ink">Retention and deletion</h2><p className="mt-2">We retain information while your account is active and as needed for security or legal obligations. Deleting your account from Settings permanently removes its profile, matching records, connected-account data, and associated chat rooms from the active database. Backup copies may remain temporarily until normal backup retention expires.</p></section>
-        <section><h2 className="text-lg font-semibold text-ink">Your choices</h2><p className="mt-2">You can edit profile and connected-account information in Settings and permanently delete your account there. Contact support for access, correction, deletion, or privacy questions that cannot be completed in the product.</p></section>
-        <p>Privacy requests can be submitted through the <Link href="/support" className="text-primary">support page</Link>.</p>
+        <section><h2 className="text-lg font-semibold text-ink">Your choices</h2><p className="mt-2">You can edit profile and connected-account information in Settings and permanently delete your account there.</p></section>
       </div>
     </main>
   );

@@ -33,7 +33,6 @@
     "GITHUB_LINK_SECRET",
     "NEXT_PUBLIC_API_URL",
     "NEXT_PUBLIC_CHAT_URL"
-    ,"NEXT_PUBLIC_SUPPORT_EMAIL"
   ],
   "tasks": {
     "build": {

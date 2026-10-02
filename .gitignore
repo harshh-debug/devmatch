@@ -21,15 +21,6 @@ coverage
 # Vercel
 .vercel
 
-# Terraform local state and operator configuration
-**/.terraform/*
-*.tfstate
-*.tfstate.*
-*.tfplan
-backend.hcl
-terraform.tfvars
-!*.tfvars.example
-
 # Build Outputs
 .next/
 out/

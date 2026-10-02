@@ -19,7 +19,6 @@ export default function Footer() {
         {/* Links */}
         <div className="flex items-center gap-6 text-[12px] text-muted">
           <a href="https://github.com/harshh-debug/devmatch" className="hover:text-ink transition-colors duration-fast">GitHub</a>
-          <Link href="/support" className="hover:text-ink transition-colors duration-fast">Support</Link>
           <Link href="/privacy" className="hover:text-ink transition-colors duration-fast">Privacy</Link>
           <Link href="/terms" className="hover:text-ink transition-colors duration-fast">Terms</Link>
         </div>

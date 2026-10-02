@@ -12,7 +12,6 @@ export default function TermsPage() {
         <section><h2 className="text-lg font-semibold text-ink">Content and matching</h2><p className="mt-2">You retain ownership of content you submit. You grant DevMatch permission to process and display it as needed to provide profiles, matching, and chat. Match scores and recommendations are automated suggestions and do not guarantee compatibility or outcomes.</p></section>
         <section><h2 className="text-lg font-semibold text-ink">Availability and termination</h2><p className="mt-2">The service may change, pause, or discontinue features. Accounts that abuse the service may be suspended. You may permanently delete your account from Settings.</p></section>
         <section><h2 className="text-lg font-semibold text-ink">Disclaimers</h2><p className="mt-2">DevMatch is provided on an “as is” and “as available” basis to the extent permitted by law. Do not use it as the sole basis for employment, financial, safety, or other high-impact decisions.</p></section>
-        <p>Questions about these terms can be submitted through the <Link href="/support" className="text-primary">support page</Link>.</p>
       </div>
     </main>
   );

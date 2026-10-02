@@ -13,7 +13,7 @@ on:
       - "packages/**"
       - "infra/compose.production.yml"
       - "infra/Caddyfile"
-      - "infra/scripts/**"
+      - "infra/scripts/deploy-release.sh"
       - "Dockerfile.backend"
       - ".dockerignore"
       - "package.json"
@@ -85,7 +85,18 @@ jobs:
       - id: ecr
         uses: aws-actions/amazon-ecr-login@v2
       - uses: docker/setup-buildx-action@v3
+      - name: Check whether image already exists
+        id: image
+        run: |
+          if aws ecr describe-images \
+            --repository-name "devmatch-${{ matrix.image }}" \
+            --image-ids "imageTag=${GITHUB_SHA}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Build and publish ${{ matrix.image }}
+        if: steps.image.outputs.exists != 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -117,10 +128,22 @@ jobs:
       - name: Deploy through SSM
         id: ssm
         run: |
+          bootstrap_commands="$(jq -cn \
+            --arg sha "$GITHUB_SHA" \
+            --arg bucket '${{ vars.RELEASE_BUCKET }}' \
+            '[
+              "set -euo pipefail",
+              "work_dir=$(mktemp -d)",
+              "trap '\''rm -rf \"$work_dir\"'\'' EXIT",
+              "aws s3 cp \"s3://\($bucket)/releases/\($sha).tar.gz\" \"$work_dir/release.tar.gz\" --only-show-errors",
+              "tar -xzf \"$work_dir/release.tar.gz\" -C \"$work_dir\"",
+              "sudo install -m 0755 \"$work_dir/infra/scripts/deploy-release.sh\" /usr/local/bin/devmatch-deploy",
+              "sudo /usr/local/bin/devmatch-deploy \($sha)"
+            ]')"
           command_id="$(aws ssm send-command \
             --instance-ids '${{ vars.EC2_INSTANCE_ID }}' \
             --document-name AWS-RunShellScript \
-            --parameters "commands=sudo /usr/local/bin/devmatch-deploy ${GITHUB_SHA}" \
+            --parameters "commands=${bootstrap_commands}" \
             --query 'Command.CommandId' \
             --output text)"
           aws ssm wait command-executed \

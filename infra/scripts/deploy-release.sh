@@ -15,7 +15,6 @@ region="$(curl --fail --silent --show-error \
   http://169.254.169.254/latest/meta-data/placement/region)"
 account_id="$(aws sts get-caller-identity --query Account --output text)"
 registry="${account_id}.dkr.ecr.${region}.amazonaws.com"
-release_bucket="devmatch-releases-${account_id}-${region}"
 release_root="/opt/devmatch/releases/${release_sha}"
 runtime_env="/opt/devmatch/runtime.env"
 current_sha_file="/opt/devmatch/CURRENT_SHA"
@@ -54,6 +53,13 @@ rollback() {
 }
 
 trap 'status=$?; if [[ $status -ne 0 ]]; then rollback || true; fi; exit $status' EXIT
+
+release_bucket="$(parameter RELEASE_BUCKET)"
+
+if [[ ! "$release_bucket" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]]; then
+  echo "RELEASE_BUCKET must be a valid S3 bucket name." >&2
+  exit 1
+fi
 
 install -d -m 0755 "$release_root"
 aws s3 cp \
