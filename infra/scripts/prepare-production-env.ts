@@ -67,7 +67,7 @@ const contents = `# Local staging file for production deployment inputs.
 AWS_REGION=ap-south-1
 AWS_ACCOUNT_ID=241810645401
 GITHUB_REPOSITORY=harshh-debug/devmatch
-APP_DOMAIN=__REQUIRED_FRONTEND_HOSTNAME__
+APP_DOMAIN=devmatch-hub.vercel.app
 API_DOMAIN=devmatch-api.duckdns.org
 CADDY_EMAIL=__REQUIRED_TLS_EMAIL__
 
@@ -93,14 +93,15 @@ GITHUB_LINK_ID=${quoted(values.githubLinkId)}
 GITHUB_LINK_SECRET=${quoted(values.githubLinkSecret)}
 
 # Derived after APP_DOMAIN/API_DOMAIN are filled.
-AUTH_URL=__DERIVE_FROM_APP_DOMAIN__
+ALLOWED_ORIGIN=https://devmatch-hub.vercel.app
+AUTH_URL=https://devmatch-hub.vercel.app
 NEXT_PUBLIC_API_URL=https://devmatch-api.duckdns.org/api/v1
 NEXT_PUBLIC_CHAT_URL=https://devmatch-api.duckdns.org
 
 # Filled after AWS infrastructure is created.
-RELEASE_BUCKET=__CREATE_IN_AWS__
-EC2_INSTANCE_ID=__CREATE_IN_AWS__
-AWS_DEPLOY_ROLE_ARN=__CREATE_IN_AWS__
+RELEASE_BUCKET=devmatch-releases-241810645401-ap-south-1
+EC2_INSTANCE_ID=i-06327d47b86c1d5db
+AWS_DEPLOY_ROLE_ARN=arn:aws:iam::241810645401:role/devmatch-github-deploy-role
 API_BASE_URL=https://devmatch-api.duckdns.org
 `;
 
