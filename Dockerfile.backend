@@ -27,7 +27,7 @@ ENV NODE_ENV=production
 ENV APP_NAME=${APP_NAME}
 COPY --from=installer --chown=bun:bun /app /app
 USER bun
-CMD ["sh", "-c", "bun --cwd apps/$APP_NAME run start"]
+CMD ["sh", "-c", "bun run --cwd apps/$APP_NAME start"]
 
 # Build with --target migrations --build-arg APP_NAME=db.
 FROM runtime AS migrations

@@ -119,7 +119,7 @@ chmod 0600 "${release_root}/compose.env"
 aws ecr get-login-password --region "$region" | \
   docker login --username AWS --password-stdin "$registry" >/dev/null
 
-compose=(docker compose --env-file "${release_root}/compose.env" -f "${release_root}/infra/compose.production.yml")
+compose=(docker compose --progress quiet --env-file "${release_root}/compose.env" -f "${release_root}/infra/compose.production.yml")
 "${compose[@]}" pull
 "${compose[@]}" up -d --wait --wait-timeout 180 redis kafka
 "${compose[@]}" run --rm kafka-init
