@@ -129,7 +129,7 @@ compose=(docker compose --progress quiet --env-file "${release_root}/compose.env
 "${compose[@]}" up -d --wait --wait-timeout 180 api-gateway
 "${compose[@]}" up -d caddy
 
-curl --fail --silent --show-error --retry 12 --retry-delay 5 \
+curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-connrefused \
   "https://${api_domain}/health/ready" >/dev/null
 
 install -m 0755 \
